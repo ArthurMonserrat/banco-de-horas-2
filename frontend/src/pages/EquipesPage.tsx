@@ -15,6 +15,7 @@ import {
   loadEditableOrganograma,
   persistOrganograma,
 } from '../services/organogramaService'
+import { backendApi, type ApiUser } from '../services/api'
 
 const cargoOptions = ['Engenheiro', 'Projetista', 'Desenhista', 'Estagiário', 'Estagiário 4h']
 const monthOptions = [
@@ -31,6 +32,24 @@ const monthOptions = [
   { value: 11, label: 'Novembro' },
   { value: 12, label: 'Dezembro' },
 ]
+
+function createOrganogramaFromApiUsers(users: ApiUser[]): DEPGerencia[] {
+  const supervisors = users.filter((user) => user.perfil === 'SUPERVISOR')
+  if (supervisors.length === 0) return []
+  return [{
+    gerente: 'Banco de Dados',
+    squads: supervisors
+      .map((supervisor) => ({
+        nome: `Equipe - ${supervisor.nome}`,
+        supervisor: supervisor.nome,
+        colaboradores: users
+          .filter((user) => user.perfil === 'COLABORADOR' && user.supervisorId === supervisor.id)
+          .map((user) => ({ nome: user.nome, cargo: user.email }))
+          .sort((left, right) => left.nome.localeCompare(right.nome)),
+      }))
+      .sort((left, right) => left.supervisor.localeCompare(right.supervisor)),
+  }]
+}
 
 function DiretoriaSidebar({ onSignOut }: { onSignOut: () => void }) {
   const linkClass = ({ isActive }: { isActive: boolean }) => `flex w-full items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left text-sm font-semibold transition ${
@@ -161,9 +180,27 @@ export function EquipesPage() {
   }, [])
 
   useEffect(() => {
-    const storedOrganograma = loadEditableOrganograma()
-    setDadosOrganograma(storedOrganograma)
-    setSquadSelecionada((current) => current || getFirstSquadName(storedOrganograma))
+    let active = true
+    const loadLocalOrganograma = () => {
+      const storedOrganograma = loadEditableOrganograma()
+      if (!active) return
+      setDadosOrganograma(storedOrganograma)
+      setSquadSelecionada((current) => current || getFirstSquadName(storedOrganograma))
+    }
+
+    void backendApi.listUsers()
+      .then(({ users }) => {
+        if (!active) return
+        const backendOrganograma = createOrganogramaFromApiUsers(users)
+        if (backendOrganograma.length === 0) {
+          loadLocalOrganograma()
+          return
+        }
+        setDadosOrganograma(backendOrganograma)
+        setSquadSelecionada((current) => current || getFirstSquadName(backendOrganograma))
+      })
+      .catch(loadLocalOrganograma)
+    return () => { active = false }
   }, [])
 
   const squadOptions = useMemo(() => getSquads(dadosOrganograma).map((squad) => squad.nome), [dadosOrganograma])

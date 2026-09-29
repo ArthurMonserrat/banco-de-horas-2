@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PerfilUsuario {
+  COLABORADOR
+  SUPERVISOR
+  DIRETOR
+}
+
+enum StatusApontamento {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+model User {
+  id              String        @id @default(cuid())
+  nome            String
+  email           String        @unique
+  senha           String
+  perfil          PerfilUsuario
+  supervisorId    String?
+  assinaturaBase64 String?       @db.Text
+  dataCriacao     DateTime      @default(now())
+
+  supervisor      User?         @relation("SupervisorEquipe", fields: [supervisorId], references: [id], onDelete: SetNull)
+  colaboradores   User[]        @relation("SupervisorEquipe")
+  apontamentos    Apontamento[]
+
+  @@index([perfil])
+  @@index([supervisorId])
+}
+
+model Apontamento {
+  id            String            @id @default(cuid())
+  userId        String
+  data          DateTime          @db.Date
+  horaInicio    String
+  horaFim       String
+  horasTotal    Decimal           @db.Decimal(6, 2)
+  projeto       String
+  atividade     String
+  detalhamento  String            @db.Text
+  status        StatusApontamento @default(PENDENTE)
+  justificativa String?           @db.Text
+  versao        Int               @default(1)
+  dataCriacao   DateTime          @default(now())
+
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rdos          Rdo[]
+
+  @@index([userId])
+  @@index([data])
+  @@index([status])
+}
+
+model Rdo {
+  id            String      @id @default(cuid())
+  apontamentoId String
+  arquivoUrl    String
+  geradoEm      DateTime    @default(now())
+
+  apontamento   Apontamento @relation(fields: [apontamentoId], references: [id], onDelete: Cascade)
+
+  @@index([apontamentoId])
+}

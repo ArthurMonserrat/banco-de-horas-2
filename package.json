@@ -1,0 +1,33 @@
+{
+  "name": "banco-de-horas-2",
+  "version": "1.0.0",
+  "description": "Backend serverless do Banco de Horas 2 para Vercel Functions e Prisma.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fer23d/banco-de-horas-2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Fer23d/banco-de-horas-2/issues"
+  },
+  "homepage": "https://github.com/Fer23d/banco-de-horas-2#readme",
+  "dependencies": {
+    "@prisma/client": "^7.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "prisma": "^7.10.0",
+    "typescript": "^7.0.2"
+  }
+}

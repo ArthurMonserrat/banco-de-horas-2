@@ -13,6 +13,7 @@ import { supervisorService } from '../services/supervisorService'
 import { directorNavigation } from '../mocks/navigation'
 import { NavigationIcon } from '../components/NavigationIcon'
 import { createManagerCalendarTeamData, loadEditableOrganograma } from '../services/organogramaService'
+import { backendApi, type ApiApontamento, type ApiUser } from '../services/api'
 
 type DiretoriaEntry = {
   id: string
@@ -38,6 +39,57 @@ const fallbackProjectHours: ProjectHoursRow[] = [
   { projeto: 'SM&A-AUT-087', horas: 96 },
   { projeto: 'SM&A-ELE-211', horas: 74 },
 ]
+
+function apiStatusToManagerStatus(status: ApiApontamento['status']): SupervisorPendingEntry['status'] {
+  if (status === 'APROVADO') return 'APPROVED'
+  if (status === 'REJEITADO') return 'REJECTED'
+  return 'PENDING'
+}
+
+function managerStatusToApiStatus(status: SupervisorPendingEntry['status']) {
+  if (status === 'APPROVED') return 'APROVADO'
+  if (status === 'REJECTED') return 'REJEITADO'
+  return 'PENDENTE'
+}
+
+function apiApontamentoToDiretoriaEntry(apontamento: ApiApontamento): DiretoriaEntry {
+  return {
+    id: apontamento.id,
+    collaboratorId: apontamento.userId,
+    entryDate: apontamento.data,
+    projectCode: apontamento.projeto,
+    durationMinutes: Math.round(apontamento.horasTotal * 60),
+    status: apontamento.status,
+  }
+}
+
+function apiApontamentoToManagerEntry(apontamento: ApiApontamento): SupervisorPendingEntry {
+  return {
+    id: apontamento.id,
+    collaboratorId: apontamento.userId,
+    collaboratorName: apontamento.userName,
+    entryDate: apontamento.data,
+    projectCode: apontamento.projeto,
+    durationMinutes: Math.round(apontamento.horasTotal * 60),
+    status: apiStatusToManagerStatus(apontamento.status),
+    activityName: apontamento.atividade,
+    details: apontamento.detalhamento,
+    rejectionReason: apontamento.justificativa ?? undefined,
+    version: apontamento.versao,
+  }
+}
+
+function createManagerCalendarTeamDataFromApi(users: ApiUser[]) {
+  const supervisors = users
+    .filter((user) => user.perfil === 'SUPERVISOR')
+    .map((user) => ({ id: user.id, name: user.nome }))
+    .sort((left, right) => left.name.localeCompare(right.name))
+  const collaborators = users
+    .filter((user) => user.perfil === 'COLABORADOR')
+    .map((user) => ({ id: user.id, name: user.nome, supervisorId: user.supervisorId ?? undefined }))
+    .sort((left, right) => left.name.localeCompare(right.name))
+  return { supervisors, collaborators }
+}
 
 function readJsonArray(key: string): unknown[] {
   if (typeof window === 'undefined') return []
@@ -147,28 +199,52 @@ export function DiretoriaPage() {
   const timesheetCycle = getTimesheetCycle()
 
   useEffect(() => {
-    const storedEntries = readJsonArray(TIME_ENTRY_STORAGE_KEY).flatMap((entry) => {
-      const normalized = normalizeEntry(entry)
-      return normalized ? [normalized] : []
-    })
-    const storedAbsences = readJsonArray(TIME_OFF_STORAGE_KEY).flatMap((absence) => {
-      const normalized = normalizeAbsence(absence)
-      return normalized ? [normalized] : []
-    })
-    setEntries(storedEntries)
-    setAbsences(storedAbsences)
+    let active = true
+    const loadLocalEntries = () => {
+      const storedEntries = readJsonArray(TIME_ENTRY_STORAGE_KEY).flatMap((entry) => {
+        const normalized = normalizeEntry(entry)
+        return normalized ? [normalized] : []
+      })
+      const storedAbsences = readJsonArray(TIME_OFF_STORAGE_KEY).flatMap((absence) => {
+        const normalized = normalizeAbsence(absence)
+        return normalized ? [normalized] : []
+      })
+      if (!active) return
+      setEntries(storedEntries)
+      setAbsences(storedAbsences)
+    }
+
+    void backendApi.listApontamentos()
+      .then(({ apontamentos }) => {
+        if (!active) return
+        setEntries(apontamentos.map(apiApontamentoToDiretoriaEntry))
+        setAbsences([])
+      })
+      .catch(loadLocalEntries)
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
     let active = true
-    void supervisorService.listEntries().then((loadedEntries) => {
+    const loadLocalManagerCalendar = async () => {
+      const loadedEntries = await supervisorService.listEntries()
       if (!active) return
       const organograma = loadEditableOrganograma()
       const { collaborators, supervisors } = createManagerCalendarTeamData(organograma)
       setManagerEntries(loadedEntries)
       setManagerCollaborators(collaborators)
       setManagerSupervisors(supervisors)
-    })
+    }
+
+    void Promise.all([backendApi.listApontamentos(), backendApi.listUsers()])
+      .then(([{ apontamentos }, { users }]) => {
+        if (!active) return
+        const { collaborators, supervisors } = createManagerCalendarTeamDataFromApi(users)
+        setManagerEntries(apontamentos.map(apiApontamentoToManagerEntry))
+        setManagerCollaborators(collaborators)
+        setManagerSupervisors(supervisors)
+      })
+      .catch(() => { void loadLocalManagerCalendar() })
     return () => { active = false }
   }, [])
 
@@ -258,14 +334,20 @@ export function DiretoriaPage() {
               supervisors={managerSupervisors}
               role="DIRECTOR_ADMIN"
               onApprove={(entry) => {
-                void supervisorService.approve(entry.id, session?.id ?? 'director').then((updated) => {
-                  setManagerEntries((current) => current.map((item) => item.id === updated.id ? updated : item))
-                })
+                void backendApi.updateApontamentoStatus(entry.id, managerStatusToApiStatus('APPROVED'))
+                  .then(({ apontamento }) => apiApontamentoToManagerEntry(apontamento))
+                  .catch(() => supervisorService.approve(entry.id, session?.id ?? 'director'))
+                  .then((updated) => {
+                    setManagerEntries((current) => current.map((item) => item.id === updated.id ? updated : item))
+                  })
               }}
               onReject={(entry, reason) => {
-                void supervisorService.reject(entry.id, session?.id ?? 'director', reason).then((updated) => {
-                  setManagerEntries((current) => current.map((item) => item.id === updated.id ? updated : item))
-                })
+                void backendApi.updateApontamentoStatus(entry.id, managerStatusToApiStatus('REJECTED'), reason)
+                  .then(({ apontamento }) => apiApontamentoToManagerEntry(apontamento))
+                  .catch(() => supervisorService.reject(entry.id, session?.id ?? 'director', reason))
+                  .then((updated) => {
+                    setManagerEntries((current) => current.map((item) => item.id === updated.id ? updated : item))
+                  })
               }}
             />
           </div>

@@ -1,7 +1,7 @@
 import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom'
 import { useState } from 'react'
 import { useMsal } from '@azure/msal-react'
-import { loginRequest } from '../authConfig'
+import { loginRequest } from '../config/msalConfig'
 import { BrandMark } from '../components/BrandMark'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { canAccessDemoPath, getDemoHomePath } from '../features/session/routePolicy'

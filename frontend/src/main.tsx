@@ -5,7 +5,7 @@ import { MsalProvider } from '@azure/msal-react'
 import { App } from './app/App'
 import { ThemeProvider } from './app/ThemeProvider'
 import { DemoSessionProvider } from './features/session/DemoSessionProvider'
-import { msalConfig } from './authConfig'
+import { msalConfig } from './config/msalConfig'
 import './pwa/registerPwa'
 import './styles/index.css'
 

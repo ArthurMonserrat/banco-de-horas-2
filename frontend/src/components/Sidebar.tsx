@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { collaboratorNavigation, directorNavigation } from '../mocks/navigation'
 import { useSession } from '../features/session/useSession'
 import { profileService } from '../services/profileService'
+import { InstallAppButton } from './InstallAppButton'
 import { NavigationIcon } from './NavigationIcon'
 
 type SidebarContentProps = {
@@ -89,6 +90,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
       </nav>
 
       <div className="border-t border-[var(--color-sidebar-border)] p-4">
+        <InstallAppButton />
         <button type="button" onClick={handleSignOut} className="w-full rounded-xl border border-[var(--color-sidebar-border)] px-4 py-3 text-left text-sm font-bold text-[var(--color-sidebar-text)] hover:bg-[var(--color-navigation-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-sidebar-text)]">
           Sair do sistema
         </button>

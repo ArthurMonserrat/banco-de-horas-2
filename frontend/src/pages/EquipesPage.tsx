@@ -3,12 +3,19 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { useSession } from '../features/session/useSession'
-import { organogramaDEP, type DEPColaborador, type DEPGerencia, type DEPSquad } from '../data/mockDEP'
+import { organogramaDEP, type DEPColaborador, type DEPGerencia } from '../data/mockDEP'
 import { exportGeneralHoursReport, exportSquadHoursReport } from '../services/excelExportService'
 import { directorNavigation } from '../mocks/navigation'
 import { NavigationIcon } from '../components/NavigationIcon'
+import {
+  findSquad,
+  getFirstSquadName,
+  getSquadNumber,
+  getSquads,
+  loadEditableOrganograma,
+  persistOrganograma,
+} from '../services/organogramaService'
 
-const ORGANOGRAMA_STORAGE_KEY = 'organograma_editavel_sma'
 const cargoOptions = ['Engenheiro', 'Projetista', 'Desenhista', 'Estagiário', 'Estagiário 4h']
 const monthOptions = [
   { value: 1, label: 'Janeiro' },
@@ -24,62 +31,6 @@ const monthOptions = [
   { value: 11, label: 'Novembro' },
   { value: 12, label: 'Dezembro' },
 ]
-
-function cloneOrganograma(data: DEPGerencia[]) {
-  return data.map((gerencia) => ({
-    ...gerencia,
-    squads: gerencia.squads.map((squad) => ({
-      ...squad,
-      colaboradores: squad.colaboradores.map((colaborador) => ({ ...colaborador })),
-    })),
-  }))
-}
-
-function getSquads(data: DEPGerencia[]) {
-  return data.flatMap((gerencia) => gerencia.squads.map((squad) => ({ ...squad, gerente: gerencia.gerente })))
-}
-
-function getSquadNumber(squadName: string) {
-  return Number.parseInt(squadName.match(/S(\d+)/)?.[1] || '0', 10)
-}
-
-function getFirstSquadName(data: DEPGerencia[]) {
-  return data[0]?.squads[0]?.nome ?? ''
-}
-
-function findSquad(data: DEPGerencia[], squadName: string): DEPSquad | null {
-  return getSquads(data).find((squad) => squad.nome === squadName) ?? null
-}
-
-function isOrganograma(value: unknown): value is DEPGerencia[] {
-  if (!Array.isArray(value)) return false
-  return value.every((gerencia) => {
-    if (!gerencia || typeof gerencia !== 'object') return false
-    const item = gerencia as Record<string, unknown>
-    return typeof item.gerente === 'string' && Array.isArray(item.squads)
-  })
-}
-
-function loadEditableOrganograma() {
-  if (typeof window === 'undefined') return cloneOrganograma(organogramaDEP)
-  try {
-    const raw = window.localStorage.getItem(ORGANOGRAMA_STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown
-      if (isOrganograma(parsed)) return cloneOrganograma(parsed)
-    }
-  } catch {
-    // Fallback to the official source below.
-  }
-  const initial = cloneOrganograma(organogramaDEP)
-  window.localStorage.setItem(ORGANOGRAMA_STORAGE_KEY, JSON.stringify(initial))
-  return initial
-}
-
-function persistOrganograma(data: DEPGerencia[]) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(ORGANOGRAMA_STORAGE_KEY, JSON.stringify(data))
-}
 
 function DiretoriaSidebar({ onSignOut }: { onSignOut: () => void }) {
   const linkClass = ({ isActive }: { isActive: boolean }) => `flex w-full items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left text-sm font-semibold transition ${

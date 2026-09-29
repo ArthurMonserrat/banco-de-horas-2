@@ -112,7 +112,7 @@ export function ManagerCalendar({ entries, collaborators, supervisors = [], role
           )}
           <label className="text-sm font-bold text-[var(--color-text)]">
           Colaborador
-          <select value={selectedCollaboratorId} onChange={(event) => handleCollaboratorChange(event.target.value)} className="mt-1 block min-w-56 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal text-[var(--color-text)]">
+          <select aria-label="Colaborador" value={selectedCollaboratorId} onChange={(event) => handleCollaboratorChange(event.target.value)} className="mt-1 block min-w-56 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal text-[var(--color-text)]">
             <option value="Todos">Todos da equipe</option>
             {scopedCollaborators.map((collaborator) => <option key={collaborator.id} value={collaborator.id}>{collaborator.name}</option>)}
           </select>

@@ -12,6 +12,7 @@ import type { SupervisorPendingEntry } from '../features/supervisor/types'
 import { supervisorService } from '../services/supervisorService'
 import { directorNavigation } from '../mocks/navigation'
 import { NavigationIcon } from '../components/NavigationIcon'
+import { createManagerCalendarTeamData, loadEditableOrganograma } from '../services/organogramaService'
 
 type DiretoriaEntry = {
   id: string
@@ -160,11 +161,13 @@ export function DiretoriaPage() {
 
   useEffect(() => {
     let active = true
-    void Promise.all([supervisorService.listEntries(), supervisorService.listCollaborators(), supervisorService.listSupervisors()]).then(([loadedEntries, loadedCollaborators, loadedSupervisors]) => {
+    void supervisorService.listEntries().then((loadedEntries) => {
       if (!active) return
+      const organograma = loadEditableOrganograma()
+      const { collaborators, supervisors } = createManagerCalendarTeamData(organograma)
       setManagerEntries(loadedEntries)
-      setManagerCollaborators(loadedCollaborators)
-      setManagerSupervisors(loadedSupervisors)
+      setManagerCollaborators(collaborators)
+      setManagerSupervisors(supervisors)
     })
     return () => { active = false }
   }, [])

@@ -3,16 +3,12 @@ import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { DesktopSidebar, MobileDrawer } from './Sidebar'
 import { closeDrawerAfterNavigation, focusDrawerInitialElement, scheduleDrawerTriggerFocus, shouldCloseDrawerForKey } from './drawer'
-import { useOfflineQueue } from '../hooks/useOfflineQueue'
-import { useNetworkStatus } from '../hooks/useNetworkStatus'
 
 const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export function AppLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
-  const { isOnline } = useNetworkStatus()
-  const queue = useOfflineQueue()
 
   const closeSidebar = (returnFocus = false) => {
     setSidebarOpen(false)
@@ -57,13 +53,6 @@ export function AppLayout() {
       <div data-layout-body className="relative grid min-h-[calc(100vh-5rem)] min-w-0 grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <DesktopSidebar />
         <main id="main-content" className="w-full min-w-0 overflow-x-hidden" tabIndex={-1}>
-          {(!isOnline || queue.length > 0) && (
-            <div className="border-b border-amber-400/40 bg-amber-950/30 px-4 py-3 text-sm font-semibold text-amber-100 sm:px-6">
-              {!isOnline
-                ? 'Modo Offline - Os apontamentos serão guardados no dispositivo.'
-                : `${queue.length} apontamento(s) a aguardar sincronização.`}
-            </div>
-          )}
           <Outlet />
         </main>
         {isSidebarOpen && (

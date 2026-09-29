@@ -2,6 +2,7 @@ import { forwardRef } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { useSession } from '../features/session/useSession'
 import { BrandMark } from './BrandMark'
+import { useNetworkStatus } from '../hooks/useNetworkStatus'
 
 type HeaderProps = {
   isMenuOpen: boolean
@@ -10,6 +11,7 @@ type HeaderProps = {
 
 export const Header = forwardRef<HTMLButtonElement, HeaderProps>(function Header({ isMenuOpen, onMenuToggle }, menuButtonRef) {
   const { profile, session } = useSession()
+  const { isOnline } = useNetworkStatus()
   const headerTitle = session?.role === 'DIRECTOR_ADMIN'
     ? 'ÁREA DA DIRETORIA'
     : session?.role === 'SUPERVISOR'
@@ -37,6 +39,12 @@ export const Header = forwardRef<HTMLButtonElement, HeaderProps>(function Header
         </div>
       </div>
       <div className="flex items-center gap-3">
+        {!isOnline && (
+          <div className="flex items-center gap-2 text-[var(--color-offline-indicator)] font-medium text-sm">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-offline-indicator)] animate-pulse"></span>
+            <span>Modo Offline</span>
+          </div>
+        )}
         <span className="hidden text-right text-xs font-semibold text-[var(--color-text-muted)] sm:block">{profile?.name}</span>
         <ThemeToggle />
       </div>

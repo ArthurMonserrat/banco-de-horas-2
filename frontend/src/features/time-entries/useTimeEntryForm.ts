@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { demoActivities, demoClients } from '../../mocks/demoData'
 import { entryDateAvailabilityService } from '../../services/entryDateAvailabilityService'
 import { timeEntryService } from '../../services/timeEntryService'
+import { backendApi } from '../../services/api'
+import { buildApiApontamentoPayload, offlineQueueService } from '../../services/offlineQueueService'
 import type { ParsedRDODay } from './rdoParser'
 import type { CreateTimeEntryData, TimeEntry, TimeEntryValidationErrors } from './types'
 import { expandTimeEntryDates, NORMAL_WORKDAY_MINUTES, requiresWorkSiteNumber } from './domain'
@@ -244,6 +246,31 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       return false
     }
 
+    const syncOrQueueApontamentos = async (entries: CreateTimeEntryData[]) => {
+      const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
+      for (const entry of entries) {
+        const payload = buildApiApontamentoPayload(profile.id, entry, {
+          startTime: values.startTime,
+          endTime: values.endTime,
+        })
+        if (!isOnline) {
+          offlineQueueService.enqueueApontamento(profile.id, entry, {
+            startTime: values.startTime,
+            endTime: values.endTime,
+          })
+          continue
+        }
+        try {
+          await backendApi.createApontamento(payload)
+        } catch {
+          offlineQueueService.enqueueApontamento(profile.id, entry, {
+            startTime: values.startTime,
+            endTime: values.endTime,
+          })
+        }
+      }
+    }
+
     setIsSubmitting(true)
     try {
       if (mode === 'EDIT' && source) {
@@ -253,10 +280,11 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
         setSuccessMessage('Apontamento atualizado com sucesso.')
       } else if (mode === 'DUPLICATE' && source) {
         await timeEntryService.duplicate(profile.id, source.id, source.version, data)
+        await syncOrQueueApontamentos([data])
         setSuccessMessage('Apontamento duplicado com sucesso.')
       } else {
         if (hasExtractedRdoDays) {
-          await Promise.all(extractedRdoDays.map((day) => timeEntryService.create(profile.id, {
+          const extractedEntries: CreateTimeEntryData[] = extractedRdoDays.map((day) => ({
             ...data,
             entryDate: day.data,
             endDate: day.data,
@@ -270,10 +298,19 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
             nightMinutes: 0,
             partialDayOffMinutes: 0,
             details: day.detalhamento,
-          })))
+          }))
+          await Promise.all(extractedEntries.map((entry) => timeEntryService.create(profile.id, entry)))
+          await syncOrQueueApontamentos(extractedEntries)
           setSuccessMessage(`${extractedRdoDays.length} lançamentos do RDO salvos individualmente com sucesso.`)
         } else {
           await timeEntryService.create(profile.id, data)
+          const entriesToSync = periodDates.map((date) => ({
+            ...data,
+            entryDate: date,
+            endDate: date,
+            weekdaysOnly: false,
+          }))
+          await syncOrQueueApontamentos(entriesToSync)
           setSuccessMessage(periodDates.length > 1
             ? `${periodDates.length} lançamentos salvos com sucesso para o período selecionado.`
             : 'Apontamento salvo com sucesso.')

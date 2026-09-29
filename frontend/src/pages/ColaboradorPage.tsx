@@ -9,6 +9,7 @@ import { DayDetails } from '../features/calendar/DayDetails'
 import { BalancePeriodFilter } from '../features/calendar/BalancePeriodFilter'
 import { useSession } from '../features/session/useSession'
 import { formatMinutes } from '../features/time-entries/domain'
+import { useOfflineQueue } from '../hooks/useOfflineQueue'
 import { getCorporateToday, getMonthKey, getTimesheetCycle, isIsoDate } from '../shared/utils/date'
 
 export function ColaboradorPage() {
@@ -24,6 +25,7 @@ export function ColaboradorPage() {
   const [range, setRange] = useState({ startDate: customStart ?? cycleRange.startDate, endDate: customEnd ?? cycleRange.endDate })
   const [rangeError, setRangeError] = useState<string | null>(null)
   const dashboard = useCollaboratorDashboard(selectedDate, monthKey, hasCustomRange ? customStart : cycleRange.startDate, hasCustomRange ? customEnd : cycleRange.endDate)
+  const offlineQueue = useOfflineQueue()
 
   useEffect(() => {
     if (!customStart || !customEnd) setRange(cycleRange)
@@ -57,6 +59,7 @@ export function ColaboradorPage() {
   const contextDescription = dashboard.data
     ? `${profile.jobTitle} · ${dashboard.data.assignment?.squadName ?? 'Squad não definida'} · Supervisão: ${dashboard.data.assignment?.supervisorName ?? 'não definida'}. Carga vigente ${dashboard.data.currentWorkload ? formatMinutes(dashboard.data.currentWorkload.dailyMinutes) : 'não cadastrada'}.`
     : `${profile.jobTitle} · Carregando contexto profissional.`
+  const pendingEntriesOfDay = offlineQueue.filter((item) => item.collaboratorId === profile.id && item.entry.entryDate === selectedDate)
 
   return (
     <PageContainer
@@ -106,7 +109,7 @@ export function ColaboradorPage() {
               onOpenDate={openCalendarDate}
             />
             <DayDetails summary={dashboard.data.selectedSummary} events={dashboard.data.selectedEvents} timeOffRequests={dashboard.data.selectedTimeOffRequests} approval={dashboard.data.selectedApproval} />
-            <DailyEntryList entries={dashboard.data.selectedEntries} />
+            <DailyEntryList entries={dashboard.data.selectedEntries} pendingEntries={pendingEntriesOfDay} />
           </>
         )}
       </div>

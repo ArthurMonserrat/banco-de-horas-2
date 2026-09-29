@@ -16,6 +16,8 @@ import { getHistoryEntryActions } from './entryActions'
 import { EntryRevisionBadge, EntryRevisionDetails } from '../time-entries/EntryRevisionBadge'
 import { StatusBadge } from '../../components/StatusBadge'
 import { approvalStatusPresentation, nonApplicableApprovalPresentation, timeEntryStatusPresentation } from '../status/presentation'
+import { useOfflineQueue } from '../../hooks/useOfflineQueue'
+import { useSession } from '../session/useSession'
 
 const activityOptions = [
   ...activityOptionsByWorkContext.field,
@@ -32,6 +34,8 @@ export function TimeEntryHistory() {
   const [cancelTarget, setCancelTarget] = useState<HistoryRow | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
+  const { profile } = useSession()
+  const pendingQueue = useOfflineQueue().filter((item) => item.collaboratorId === profile?.id)
 
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return
@@ -52,6 +56,35 @@ export function TimeEntryHistory() {
       {history.error && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"><p>{history.error}</p><button type="button" onClick={() => void history.reload()} className="mt-2 font-bold underline">Tentar novamente</button></div>}
       {history.isLoading && <p aria-live="polite" className="rounded-2xl ui-surface p-8 text-center font-semibold ui-text-muted">Carregando histórico…</p>}
       {!history.isLoading && history.periodSummary && <HistoryPeriodSummary summary={history.periodSummary} events={history.periodEvents} timeOffRequests={history.periodTimeOffRequests} />}
+      {pendingQueue.length > 0 && (
+        <section className="rounded-2xl border border-amber-300/60 bg-amber-950/20 p-5 text-amber-50" aria-labelledby="offline-pending-title">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-200">Modo Offline</p>
+              <h2 id="offline-pending-title" className="mt-1 text-lg font-extrabold">A aguardar sincronização</h2>
+            </div>
+            <span className="rounded-full border border-amber-300/50 px-3 py-1 text-xs font-bold">{pendingQueue.length} pendente(s)</span>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {pendingQueue.map((item) => {
+              const client = demoClients.find((clientOption) => clientOption.id === item.entry.clientId)?.name ?? 'Cliente não disponível'
+              const activity = activityOptions.find((activityOption) => activityOption.id === item.entry.activityId)?.name ?? 'Atividade não disponível'
+              return (
+                <article key={item.id} className="rounded-xl border border-amber-300/30 ui-surface-subtle p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-bold">{formatDatePtBr(item.entry.entryDate)} · Projeto {item.entry.projectCode}</p>
+                      <p className="mt-1 text-sm text-amber-100/80">{client} · {activity} · {formatMinutes(item.entry.durationMinutes)}</p>
+                      <p className="mt-2 text-sm text-amber-50/90">{item.entry.details}</p>
+                    </div>
+                    <span className="shrink-0 rounded-lg bg-amber-300 px-3 py-2 text-xs font-extrabold text-amber-950">⏳ A aguardar sincronização</span>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      )}
       {!history.isLoading && !history.error && history.rows.length === 0 && <div className="rounded-2xl border border-dashed ui-border ui-surface p-10 text-center"><p className="font-bold ui-heading">Nenhum apontamento encontrado.</p><p className="mt-2 text-sm ui-text-subtle">Ajuste os filtros ou registre um novo apontamento.</p></div>}
       {!history.isLoading && history.rows.length > 0 && (
         <div className="space-y-4">

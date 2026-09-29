@@ -31,6 +31,19 @@ export type ApiApontamento = {
   dataCriacao: string
 }
 
+export type CreateApiApontamentoInput = {
+  userId?: string
+  data: string
+  horaInicio: string
+  horaFim: string
+  horasTotal: number
+  projeto: string
+  atividade: string
+  detalhamento: string
+  status?: ApiStatusApontamento
+  justificativa?: string
+}
+
 export type ApiSession = {
   token: string
   user: ApiUser
@@ -96,6 +109,13 @@ export const backendApi = {
 
   async listApontamentos() {
     return apiFetch<{ apontamentos: ApiApontamento[] }>('/api/apontamentos')
+  },
+
+  async createApontamento(input: CreateApiApontamentoInput) {
+    return apiFetch<{ apontamento: ApiApontamento }>('/api/apontamentos', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
   },
 
   async updateApontamentoStatus(id: string, status: ApiStatusApontamento, justificativa?: string) {

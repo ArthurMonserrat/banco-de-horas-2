@@ -60,7 +60,7 @@ export function LoginPageContent({ from, signIn, handleLogin, authError, navigat
       <section className="w-full max-w-6xl" aria-labelledby="demo-login-title">
         <header className="mx-auto mb-10 flex max-w-2xl flex-col items-center text-center">
           <BrandMark variant="full" className="mb-7" />
-          <p className="ui-badge-secondary">Ambiente corporativo</p>
+          <p className="ui-badge-secondary">Banco de horas 2: Campo e Estudos</p>
           <h1 id="demo-login-title" className="mt-4 text-3xl font-extrabold text-[var(--color-primary)] sm:text-4xl">
             Escolha seu perfil
           </h1>

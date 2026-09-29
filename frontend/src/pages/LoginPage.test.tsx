@@ -66,7 +66,7 @@ describe('LoginPage', () => {
   it('explica o acesso corporativo e apresenta os três perfis', () => {
     const markup = renderLogin()
 
-    expect(markup).toContain('Ambiente corporativo')
+    expect(markup).toContain('Banco de horas 2: Campo e Estudos')
     expect(markup).toContain('Acesse o sistema pelo perfil adequado ao seu fluxo de trabalho.')
     expect(markup).toContain('alt="SM&amp;A — Sistemas Elétricos e Automação"')
     for (const label of [

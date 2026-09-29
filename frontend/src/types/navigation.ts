@@ -1,5 +1,7 @@
+import type { NavigationIconName } from '../components/NavigationIcon'
+
 export type NavigationItem = {
   label: string
   path: string
-  shortLabel: string
+  icon: NavigationIconName
 }

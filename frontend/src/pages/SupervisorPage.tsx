@@ -18,6 +18,7 @@ import { formatMinutes } from '../features/time-entries/domain'
 import { getCorporateToday, getTimesheetCycle, isIsoDate } from '../shared/utils/date'
 import { getAllColaboradores } from '../data/mockDEP'
 import { AvisosPage } from './AvisosPage'
+import { NavigationIcon, type NavigationIconName } from '../components/NavigationIcon'
 
 type ActiveView = 'entries' | 'requests' | 'history' | 'profile' | 'announcements'
 type EntryStatusFilter = 'ALL' | SupervisorPendingEntry['status']
@@ -47,12 +48,12 @@ const defaultSupervisorProfile: SupervisorProfile = {
   squadName: 'Engenharia de Automação',
 }
 
-const supervisorNavigation: Array<{ id: ActiveView, label: string, shortLabel: string }> = [
-  { id: 'entries', label: 'Gestão da Equipe', shortLabel: 'GE' },
-  { id: 'requests', label: 'Solicitações', shortLabel: 'SO' },
-  { id: 'history', label: 'Histórico', shortLabel: 'HI' },
-  { id: 'profile', label: 'Meu Perfil', shortLabel: 'MP' },
-  { id: 'announcements', label: 'Avisos', shortLabel: 'AV' },
+const supervisorNavigation: Array<{ id: ActiveView, label: string, icon: NavigationIconName }> = [
+  { id: 'entries', label: 'Gestão da Equipe', icon: 'users' },
+  { id: 'requests', label: 'Solicitações', icon: 'inbox' },
+  { id: 'history', label: 'Histórico', icon: 'history' },
+  { id: 'announcements', label: 'Avisos', icon: 'bell' },
+  { id: 'profile', label: 'Meu Perfil', icon: 'user' },
 ]
 
 function readSupervisorProfile(): SupervisorProfile {
@@ -127,7 +128,7 @@ function SupervisorSidebar({ activeView, profile, onChange, onSignOut }: {
                 isActive ? 'border-[var(--color-primary)] bg-[var(--color-navigation-active)] text-[var(--color-navigation-active-text)]' : 'border-transparent text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-navigation-hover)] hover:text-[var(--color-sidebar-text)]'
               }`}
             >
-              <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs ${isActive ? 'bg-[var(--color-navigation-active-detail)] text-[var(--color-primary)]' : 'bg-[var(--color-sidebar-surface)]'}`}>{item.shortLabel}</span>
+              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-[var(--color-navigation-active-detail)] text-[var(--color-primary)]' : 'bg-[var(--color-sidebar-surface)]'}`}><NavigationIcon name={item.icon} /></span>
               <span className="flex-1">{item.label}</span>
               {isActive && <span className="text-[10px] font-extrabold uppercase" aria-label="Página atual">Atual</span>}
             </button>

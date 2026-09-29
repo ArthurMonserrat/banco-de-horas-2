@@ -6,6 +6,7 @@ import { useSession } from '../features/session/useSession'
 import { organogramaDEP, type DEPColaborador, type DEPGerencia, type DEPSquad } from '../data/mockDEP'
 import { exportGeneralHoursReport, exportSquadHoursReport } from '../services/excelExportService'
 import { directorNavigation } from '../mocks/navigation'
+import { NavigationIcon } from '../components/NavigationIcon'
 
 const ORGANOGRAMA_STORAGE_KEY = 'organograma_editavel_sma'
 const cargoOptions = ['Engenheiro', 'Projetista', 'Desenhista', 'Estagiário', 'Estagiário 4h']
@@ -101,8 +102,12 @@ function DiretoriaSidebar({ onSignOut }: { onSignOut: () => void }) {
       <nav className="flex-1 space-y-2 p-4" aria-label="Menu lateral da diretoria">
         {directorNavigation.map((item) => (
           <NavLink key={item.path} to={item.path} end={item.path === '/administracao'} className={linkClass}>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-sidebar-surface)] text-xs">{item.shortLabel}</span>
-            <span className="flex-1">{item.label}</span>
+            {({ isActive }) => (
+              <>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-[var(--color-navigation-active-detail)] text-[var(--color-primary)]' : 'bg-[var(--color-sidebar-surface)]'}`}><NavigationIcon name={item.icon} /></span>
+                <span className="flex-1">{item.label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

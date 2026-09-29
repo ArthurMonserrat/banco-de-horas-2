@@ -11,6 +11,10 @@ import { AppLayout } from './AppLayout'
 import { Header } from './Header'
 import { closeDrawerAfterNavigation, focusDrawerInitialElement, restoreDrawerTriggerFocus, scheduleDrawerTriggerFocus, shouldCloseDrawerForKey } from './drawer'
 import { PageContainer } from './PageContainer'
+import { collaboratorNavigation, directorNavigation } from '../mocks/navigation'
+import supervisorSource from '../pages/SupervisorPage.tsx?raw'
+import diretoriaSource from '../pages/DiretoriaPage.tsx?raw'
+import equipesSource from '../pages/EquipesPage.tsx?raw'
 
 const collaboratorSession: DemoSession = {
   id: demoCollaborator.id,
@@ -79,6 +83,43 @@ function renderGuard(
 }
 
 describe('layout responsivo do colaborador', () => {
+  it('mantém a mesma ordem e os ícones semânticos do Banco 1 no menu do colaborador', () => {
+    expect(collaboratorNavigation.map((item) => [item.label, item.icon])).toEqual([
+      ['Visão geral', 'dashboard'],
+      ['Novo apontamento', 'file-plus'],
+      ['Histórico', 'history'],
+      ['Ausências', 'calendar-off'],
+      ['Avisos', 'bell'],
+      ['Meu perfil', 'user'],
+    ])
+  })
+
+  it('mantém a mesma ordem e os ícones semânticos do Banco 1 no menu da diretoria', () => {
+    expect(directorNavigation.map((item) => [item.label, item.icon])).toEqual([
+      ['Painel Diretor', 'dashboard'],
+      ['Equipes', 'users'],
+      ['Relatórios', 'bar-chart'],
+      ['Avisos', 'bell'],
+    ])
+  })
+
+  it.each([
+    ['painel da diretoria', diretoriaSource],
+    ['gerenciamento de equipes', equipesSource],
+  ])('usa o mesmo fundo claro do ícone ativo nas sidebars da direção: %s', (_page, source) => {
+    expect(source).toContain("isActive ? 'bg-[var(--color-navigation-active-detail)] text-[var(--color-primary)]' : 'bg-[var(--color-sidebar-surface)]'")
+  })
+
+  it('mantém Avisos antes de Meu Perfil e com ícone semântico no menu do supervisor', () => {
+    const navigationStart = supervisorSource.indexOf('const supervisorNavigation')
+    const navigationEnd = supervisorSource.indexOf(']\n\nfunction readSupervisorProfile', navigationStart)
+    const navigation = supervisorSource.slice(navigationStart, navigationEnd)
+
+    expect(navigation).toContain("{ id: 'announcements', label: 'Avisos', icon: 'bell' }")
+    expect(navigation).toContain("{ id: 'profile', label: 'Meu Perfil', icon: 'user' }")
+    expect(navigation.indexOf("id: 'announcements'")).toBeLessThan(navigation.indexOf("id: 'profile'"))
+  })
+
   it('renderiza apenas o menu da diretoria para o Diretor', () => {
     const markup = renderLayoutForSession(directorSession)
     const sidebarStart = markup.indexOf('data-desktop-sidebar="true"')

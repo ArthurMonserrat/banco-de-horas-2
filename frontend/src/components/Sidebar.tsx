@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { collaboratorNavigation, directorNavigation } from '../mocks/navigation'
 import { useSession } from '../features/session/useSession'
 import { profileService } from '../services/profileService'
+import { NavigationIcon } from './NavigationIcon'
 
 type SidebarContentProps = {
   onNavigate: () => void
@@ -78,7 +79,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
           >
             {({ isActive }) => (
               <>
-                <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs ${isActive ? 'bg-[var(--color-navigation-active-detail)] text-[var(--color-primary)]' : 'bg-[var(--color-sidebar-surface)]'}`}>{item.shortLabel}</span>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-[var(--color-navigation-active-detail)] text-[var(--color-primary)]' : 'bg-[var(--color-sidebar-surface)]'}`}><NavigationIcon name={item.icon} /></span>
                 <span className={`flex-1 ${item.path === '/colaborador/avisos' || item.path === '/avisos' ? 'tour-avisos' : ''}`}>{item.label}</span>
                 {isActive && <span className="text-[10px] font-extrabold uppercase" aria-label="Página atual">Atual</span>}
               </>

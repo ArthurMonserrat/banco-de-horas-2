@@ -1,59 +1,20 @@
-import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useMsal } from '@azure/msal-react'
 import { loginRequest } from '../config/msalConfig'
 import { BrandMark } from '../components/BrandMark'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { canAccessDemoPath, getDemoHomePath } from '../features/session/routePolicy'
-import type { SessionContextValue } from '../features/session/sessionContext'
-import type { DemoRole } from '../features/session/types'
+import { mapMicrosoftRoles } from '../features/session/microsoftAuth'
 import { useSession } from '../features/session/useSession'
 
-type DemoProfileCard = {
-  role: DemoRole
-  name: string
-  description: string
-  actionLabel: string
-}
-
-const DEMO_PROFILE_CARDS: readonly DemoProfileCard[] = [
-  {
-    role: 'COLLABORATOR',
-    name: 'Colaborador',
-    description: 'Apontamentos, saldos, histórico, ausências e perfil.',
-    actionLabel: 'Entrar como Colaborador',
-  },
-  {
-    role: 'SUPERVISOR',
-    name: 'Supervisor',
-    description: 'Equipes, aprovações e solicitações.',
-    actionLabel: 'Entrar como Supervisor',
-  },
-  {
-    role: 'DIRECTOR_ADMIN',
-    name: 'Diretor/Administração',
-    description: 'Visão administrativa e gerencial.',
-    actionLabel: 'Entrar como Diretor/Administração',
-  },
-]
-
 type LoginPageContentProps = {
-  from: unknown
-  signIn: SessionContextValue['signIn']
   handleLogin: () => Promise<void>
   authError: string | null
-  navigate: NavigateFunction
+  isAuthenticating?: boolean
 }
 
-export function LoginPageContent({ from, signIn, handleLogin, authError, navigate }: LoginPageContentProps) {
-  const enterDemo = (role: DemoRole) => {
-    const destination = typeof from === 'string' && canAccessDemoPath(role, from)
-      ? from
-      : getDemoHomePath(role)
-    signIn(role)
-    navigate(destination, { replace: true })
-  }
-
+export function LoginPageContent({ handleLogin, authError, isAuthenticating = false }: LoginPageContentProps) {
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-[var(--color-background)] px-4 py-20 text-[var(--color-text)] sm:px-6">
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
@@ -67,55 +28,47 @@ export function LoginPageContent({ from, signIn, handleLogin, authError, navigat
           <p className="mt-4 text-sm leading-6 text-[var(--color-text-muted)] sm:text-base">
             Acesse o sistema pelo perfil adequado ao seu fluxo de trabalho. A autenticação corporativa pode ser usada quando configurada.
           </p>
-          <button type="button" onClick={() => void handleLogin()} className="ui-button-secondary mt-6">
-            Entrar com Microsoft
+          <button type="button" onClick={() => void handleLogin()} disabled={isAuthenticating} className="ui-button-secondary mt-6 disabled:cursor-wait disabled:opacity-60">
+            {isAuthenticating ? 'Processando autenticação...' : 'Entrar com Microsoft'}
           </button>
           {authError && <p role="alert" className="mt-3 text-sm font-semibold text-[var(--color-danger)]">{authError}</p>}
         </header>
 
-        <div className="grid gap-5 md:grid-cols-3">
-          {DEMO_PROFILE_CARDS.map((profile) => (
-            <article key={profile.role} className="profile-card ui-card flex min-h-64 flex-col rounded-2xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">
-                Perfil de acesso
-              </p>
-              <h2 className="mt-3 text-xl font-extrabold text-[var(--color-text)]">{profile.name}</h2>
-              <p className="mt-3 flex-1 text-sm leading-6 text-[var(--color-text-muted)]">{profile.description}</p>
-              <button type="button" onClick={() => enterDemo(profile.role)} className="ui-button-primary mt-6 w-full">
-                {profile.actionLabel}
-              </button>
-            </article>
-          ))}
-        </div>
       </section>
     </main>
   )
 }
 
 export function LoginPage() {
-  const { signIn } = useSession()
-  const { instance } = useMsal()
+  const { signInMicrosoft } = useSession()
+  const { instance, inProgress } = useMsal()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: unknown } | null)?.from
   const [authError, setAuthError] = useState<string | null>(null)
 
   async function handleLogin() {
+    if (inProgress !== 'none') return
     setAuthError(null)
     try {
       const response = await instance.loginPopup(loginRequest)
       const account = response.account
-      if (account) {
-        window.localStorage.setItem('sma:microsoft-user:v1', JSON.stringify({
-          name: account.name ?? account.username,
-          email: account.username,
-          homeAccountId: account.homeAccountId,
-        }))
-      }
+      if (!account) throw new Error('A Microsoft não retornou uma conta válida.')
+      if (!signInMicrosoft) throw new Error('O contexto de sessão Microsoft não está disponível.')
+      instance.setActiveAccount(account)
+      const role = mapMicrosoftRoles(account.idTokenClaims?.roles)
+      signInMicrosoft({
+        id: account.homeAccountId,
+        name: account.name?.trim() || account.username,
+        email: account.username,
+        role,
+      })
+      const destination = typeof from === 'string' && canAccessDemoPath(role, from) ? from : getDemoHomePath(role)
+      navigate(destination, { replace: true })
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Não foi possível autenticar com a Microsoft.')
     }
   }
 
-  return <LoginPageContent from={from} signIn={signIn} handleLogin={handleLogin} authError={authError} navigate={navigate} />
+  return <LoginPageContent handleLogin={handleLogin} authError={authError} isAuthenticating={inProgress !== 'none'} />
 }

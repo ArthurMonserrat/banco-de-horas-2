@@ -23,6 +23,7 @@ export interface SessionStorage {
 export interface DemoSessionService {
   restore(): DemoSession | null
   signIn(role: DemoRole): DemoSession
+  signInWithMicrosoft(identity: { id: string; name: string; email: string; role: DemoRole }): DemoSession
   signOut(): void
 }
 
@@ -92,6 +93,24 @@ export class LocalDemoSessionService implements DemoSessionService {
       createdAt: timestamp,
       explicitLoginAt: timestamp,
       isDemo: true,
+      authProvider: 'demo',
+      version: 2,
+    }
+    this.write(SESSION_KEY, JSON.stringify(session))
+    return session
+  }
+
+  signInWithMicrosoft(identity: { id: string; name: string; email: string; role: DemoRole }): DemoSession {
+    const timestamp = this.now()
+    const session: DemoSession = {
+      id: identity.id,
+      name: identity.name,
+      email: identity.email,
+      role: identity.role,
+      createdAt: timestamp,
+      explicitLoginAt: timestamp,
+      isDemo: true,
+      authProvider: 'microsoft',
       version: 2,
     }
     this.write(SESSION_KEY, JSON.stringify(session))

@@ -9,6 +9,7 @@ export type SessionContextValue = {
   profile: CollaboratorProfile | null
   isLoading: boolean
   signIn: DemoSignIn
+  signInMicrosoft?: (identity: { id: string; name: string; email: string; role: DemoRole }) => DemoSession
   signOut: () => void
 }
 

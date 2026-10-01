@@ -40,11 +40,16 @@ export function DemoSessionProvider({ children }: { children: ReactNode }) {
     setSession(created)
     return created
   }
+  const signInMicrosoft = (identity: { id: string; name: string; email: string; role: DemoRole }) => {
+    const created = demoSessionService.signInWithMicrosoft(identity)
+    setSession(created)
+    return created
+  }
   const signOut = () => {
     demoSessionService.signOut()
     setSession(null)
     setProfile(null)
   }
 
-  return <SessionContext.Provider value={{ session, profile, isLoading, signIn, signOut }}>{children}</SessionContext.Provider>
+  return <SessionContext.Provider value={{ session, profile, isLoading, signIn, signInMicrosoft, signOut }}>{children}</SessionContext.Provider>
 }

@@ -4,7 +4,7 @@ const DIRECTOR_ROLES = new Set(['admin', 'administrator', 'diretor', 'diretoria'
 const SUPERVISOR_ROLES = new Set(['supervisor', 'supervisao', 'supervision'])
 
 function normalizeRole(role: string) {
-  return role.trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\/\s-]+/g, '_')
+  return role.trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[/\s-]+/g, '_')
 }
 
 export function mapMicrosoftRoles(roles: unknown): DemoRole {

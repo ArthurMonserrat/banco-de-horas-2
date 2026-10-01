@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useMsal } from '@azure/msal-react'
-import { loginRequest } from '../config/msalConfig'
+import { isMsalConfigured, loginRequest, msalConfigurationError } from '../config/msalConfig'
 import { BrandMark } from '../components/BrandMark'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { canAccessDemoPath, getDemoHomePath } from '../features/session/routePolicy'
@@ -50,6 +50,10 @@ export function LoginPage() {
   async function handleLogin() {
     if (inProgress !== 'none') return
     setAuthError(null)
+    if (!isMsalConfigured) {
+      setAuthError(msalConfigurationError ?? 'Configure as credenciais da Microsoft antes de entrar.')
+      return
+    }
     try {
       const response = await instance.loginPopup(loginRequest)
       const account = response.account

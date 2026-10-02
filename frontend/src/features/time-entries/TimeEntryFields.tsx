@@ -1,6 +1,5 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { demoClients } from '../../mocks/demoData'
-import { fetchProjetos, type ProjetoApi } from '../../services/projetosService'
 import { formatDatePtBr } from '../../shared/utils/date'
 import { allTimeEntryActivities, requiresWorkSiteNumber } from './domain'
 import { parseRDO } from './rdoParser'
@@ -42,8 +41,6 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
   const [rdoStatus, setRdoStatus] = useState<'idle' | 'reading' | 'success' | 'error'>('idle')
   const [rdoMessage, setRdoMessage] = useState<string | null>(null)
   const [mostrarTodosDias, setMostrarTodosDias] = useState(false)
-  const [projetos, setProjetos] = useState<ProjetoApi[]>([])
-  const [projetosStatus, setProjetosStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const activityOptions = allTimeEntryActivities
   const activityRequiresWorkSiteNumber = entryMode === 'rdo' || requiresWorkSiteNumber(values.activityId)
   const hasExtractedRdoDays = extractedRdoDays.length > 0
@@ -51,30 +48,6 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
     .slice(0, 4)
     .map((day) => `${formatDatePtBr(day.data)} (${formatRdoDayDuration(day)})`)
     .join(', ')
-
-  useEffect(() => {
-    let active = true
-    void fetchProjetos()
-      .then((loadedProjects) => {
-        if (!active) return
-        setProjetos(loadedProjects)
-        setProjetosStatus('ready')
-      })
-      .catch((error: unknown) => {
-        console.error('Não foi possível carregar os projetos do Supabase.', error)
-        if (active) setProjetosStatus('error')
-      })
-    return () => { active = false }
-  }, [])
-
-  const projectOptions = projetos
-    .filter((project) => Boolean(project.pro_st_apelido?.trim()))
-    .map((project) => ({
-      value: project.pro_st_apelido!.trim(),
-      label: `[${project.pro_st_apelido!.trim()}] - ${project.cliente?.trim() || 'Cliente não informado'}`,
-      description: project.pro_st_descricao?.trim() || '',
-    }))
-  const selectedProjectIsListed = projectOptions.some((project) => project.value === values.projectCode)
 
   async function handleRDOImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -191,13 +164,9 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
 
       <div>
         <label htmlFor="project-code" className="text-sm font-bold ui-text">Número do projeto / obra{activityRequiresWorkSiteNumber ? ' *' : ''}</label>
-        <select id="project-code" name="projectCode" value={values.projectCode} onChange={(event) => { onChange('projectCode', event.target.value); onChange('numeroObra', event.target.value) }} className={fieldClassName} disabled={projetosStatus === 'loading'} aria-invalid={Boolean(errors.projectCode || errors.numeroObra)} aria-describedby={errors.projectCode ? 'project-code-help project-code-error' : 'project-code-help'}>
-          <option value="">{projetosStatus === 'loading' ? 'Carregando projetos...' : 'Selecione um projeto'}</option>
-          {values.projectCode && !selectedProjectIsListed && <option value={values.projectCode}>{values.projectCode}</option>}
-          {projectOptions.map((project) => <option key={project.value} value={project.value} title={project.description}>{project.label}</option>)}
-        </select>
+        <input id="project-code" name="projectCode" type="text" value={values.projectCode} onChange={(event) => { onChange('projectCode', event.target.value); onChange('numeroObra', event.target.value) }} className={fieldClassName} placeholder="Digite o número do projeto ou da obra" aria-invalid={Boolean(errors.projectCode || errors.numeroObra)} aria-describedby={errors.projectCode ? 'project-code-help project-code-error' : 'project-code-help'} />
         <p id="project-code-help" className="mt-1.5 text-xs ui-text-subtle">
-          {projetosStatus === 'error' ? 'Não foi possível carregar os projetos. Tente novamente ou contate o suporte.' : 'Selecione o projeto ou a obra vinculada ao apontamento.'}
+          Informe livremente o projeto ou a obra vinculada ao apontamento.
         </p>
         <FieldError id="project-code-error" message={errors.projectCode} />
         <FieldError id="work-site-number-error" message={errors.numeroObra} />

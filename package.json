@@ -9,6 +9,7 @@
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "postinstall": "prisma generate",
     "test:api": "node --import tsx --test tests/*.test.ts"
   },
   "repository": {

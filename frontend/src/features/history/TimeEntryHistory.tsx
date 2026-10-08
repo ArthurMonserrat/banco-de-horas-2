@@ -17,6 +17,7 @@ import { EntryRevisionBadge, EntryRevisionDetails } from '../time-entries/EntryR
 import { StatusBadge } from '../../components/StatusBadge'
 import { approvalStatusPresentation, nonApplicableApprovalPresentation, timeEntryStatusPresentation } from '../status/presentation'
 import { useOfflineAutoSync } from '../../hooks/useOfflineQueue'
+import { offlineQueueService } from '../../services/offlineQueueService'
 import { useSession } from '../session/useSession'
 
 const activityOptions = [
@@ -38,6 +39,11 @@ export function TimeEntryHistory() {
   const offlineSync = useOfflineAutoSync()
   const pendingQueue = offlineSync.queue.filter((item) => item.collaboratorId === profile?.id)
 
+  const handleDeleteOfflineEntry = (id: string) => {
+    if (!window.confirm('Tem certeza que deseja descartar este apontamento não sincronizado?')) return
+    offlineQueueService.remove(id)
+  }
+
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return
     setIsCancelling(true)
@@ -58,39 +64,49 @@ export function TimeEntryHistory() {
       {history.isLoading && <p aria-live="polite" className="rounded-2xl ui-surface p-8 text-center font-semibold ui-text-muted">Carregando histórico…</p>}
       {!history.isLoading && history.periodSummary && <HistoryPeriodSummary summary={history.periodSummary} events={history.periodEvents} timeOffRequests={history.periodTimeOffRequests} />}
       {pendingQueue.length > 0 && (
-        <section className="rounded-2xl border border-amber-300/60 bg-amber-950/20 p-5 text-amber-50" aria-labelledby="offline-pending-title">
+        <section className="rounded-2xl border ui-border ui-surface-subtle p-5 ui-text shadow-sm" aria-labelledby="offline-pending-title">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-200">Modo Offline</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-200">Modo Offline</p>
               <h2 id="offline-pending-title" className="mt-1 text-lg font-extrabold">A aguardar sincronização</h2>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-amber-300/50 px-3 py-1 text-xs font-bold">{pendingQueue.length} pendente(s)</span>
+              <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 dark:border-amber-300/50 dark:bg-transparent dark:text-amber-100">{pendingQueue.length} pendente(s)</span>
               <button
                 type="button"
                 onClick={() => void offlineSync.syncNow({ interactive: true })}
                 disabled={!offlineSync.isOnline || offlineSync.isSyncing}
-                className="rounded-lg border border-amber-200/60 px-3 py-1.5 text-xs font-extrabold transition hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-amber-400 px-3 py-1.5 text-xs font-extrabold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-200/60 dark:text-amber-100 dark:hover:bg-amber-300/20"
                 title={!offlineSync.isOnline ? 'A sincronização exige conexão com a internet.' : undefined}
               >
                 {offlineSync.isSyncing ? 'Sincronizando...' : '🔄 Forçar Sincronização'}
               </button>
             </div>
           </div>
-          {offlineSync.syncError && <p role="alert" className="mt-3 text-sm font-semibold text-amber-100">{offlineSync.syncError}</p>}
+          {offlineSync.syncError && <p role="alert" className="mt-3 text-sm font-semibold text-amber-800 dark:text-amber-100">{offlineSync.syncError}</p>}
           <div className="mt-4 grid gap-3">
             {pendingQueue.map((item) => {
               const client = demoClients.find((clientOption) => clientOption.id === item.entry.clientId)?.name ?? 'Cliente não disponível'
               const activity = activityOptions.find((activityOption) => activityOption.id === item.entry.activityId)?.name ?? 'Atividade não disponível'
               return (
-                <article key={item.id} className="rounded-xl border border-amber-300/30 ui-surface-subtle p-4">
+                <article key={item.id} className="rounded-xl border ui-border ui-surface p-4 ui-text shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-bold">{formatDatePtBr(item.entry.entryDate)} · Projeto {item.entry.projectCode}</p>
-                      <p className="mt-1 text-sm text-amber-100/80">{client} · {activity} · {formatMinutes(item.entry.durationMinutes)}</p>
-                      <p className="mt-2 text-sm text-amber-50/90">{item.entry.details}</p>
+                      <p className="mt-1 text-sm ui-text-muted">{client} · {activity} · {formatMinutes(item.entry.durationMinutes)}</p>
+                      <p className="mt-2 text-sm leading-6 ui-text">{item.entry.details}</p>
                     </div>
-                    <span className="shrink-0 rounded-lg bg-amber-300 px-3 py-2 text-xs font-extrabold text-amber-950">⏳ A aguardar sincronização</span>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                      <span className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-extrabold text-amber-900 dark:bg-amber-300 dark:text-amber-950">⏳ A aguardar sincronização</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOfflineEntry(item.id)}
+                        className="rounded-lg border border-red-300 px-3 py-2 text-xs font-extrabold text-red-700 transition hover:bg-red-50 hover:text-red-800 dark:border-red-400/60 dark:text-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-200"
+                        aria-label={`Descartar apontamento de ${formatDatePtBr(item.entry.entryDate)}`}
+                      >
+                        🗑️ Descartar
+                      </button>
+                    </div>
                   </div>
                 </article>
               )

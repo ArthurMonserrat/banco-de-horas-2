@@ -7,6 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
+    "build": "npm ci --prefix frontend && npm --prefix frontend run build",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "postinstall": "prisma generate",

@@ -4,6 +4,23 @@ import type { TimeEntryStatus } from '../time-entries/types'
 import type { TimeOffRequestStatus } from '../time-off/types'
 import type { WorkloadChangeRequestStatus } from '../workloads/types'
 
+const rawStatusLabels: Readonly<Record<string, string>> = {
+  ACTIVE: 'Ativo',
+  APPROVED: 'Aprovado',
+  AVAILABLE_FOR_APPROVAL: 'Disponível para aprovação',
+  CANCELLED: 'Cancelado',
+  CORRECTION_REQUESTED: 'Correção solicitada',
+  IN_PROGRESS: 'Em andamento',
+  NO_SUBMISSION: 'Sem apontamento enviado',
+  PENDING: 'Pendente',
+  REJECTED: 'Rejeitado',
+  REOPENED: 'Reaberto',
+}
+
+export function formatStatus(status: string) {
+  return rawStatusLabels[status] ?? status
+}
+
 type StatusPresentation = Readonly<{
   label: string
   tone: StatusTone

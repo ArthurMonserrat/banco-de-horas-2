@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   approvalStatusPresentation,
+  formatStatus,
   revisionStatusPresentation,
   timeEntryStatusPresentation,
   timeOffStatusPresentation,
@@ -40,5 +41,15 @@ describe('catálogo de apresentação dos status', () => {
       CANCELLED: { label: 'Cancelado', tone: 'cancelled' },
     })
     expect(revisionStatusPresentation).toEqual({ label: 'Editado', tone: 'info' })
+  })
+
+  it('traduz os estados técnicos de apontamento para português', () => {
+    expect(formatStatus('PENDING')).toBe('Pendente')
+    expect(formatStatus('APPROVED')).toBe('Aprovado')
+    expect(formatStatus('REJECTED')).toBe('Rejeitado')
+  })
+
+  it('preserva um status desconhecido para facilitar diagnóstico', () => {
+    expect(formatStatus('STATUS_NOVO')).toBe('STATUS_NOVO')
   })
 })

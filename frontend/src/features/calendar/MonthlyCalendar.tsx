@@ -3,6 +3,7 @@ import { formatDatePtBr } from '../../shared/utils/date'
 import { getMonthGridCells, shiftMonth } from './domain'
 import type { DailySummary } from './types'
 import { CalendarLegend } from './CalendarLegend'
+import { formatStatus } from '../status/presentation'
 import { calendarStatePresentation } from './presentation'
 
 export type CalendarDayPreview = {
@@ -88,7 +89,7 @@ export function MonthlyCalendar({ monthKey, selectedDate, days, onMonthChange, o
               </span>
               <span className="mt-1 block text-[9px] font-semibold sm:text-[10px]">{worked}/{expected}</span>
               {preview && (
-                <span className="mt-1 block truncate text-[9px] font-bold leading-tight text-[var(--color-primary)] sm:text-[10px]" title={`${preview.projectCode || preview.activityName} · ${preview.status}`}>
+                <span className="mt-1 block truncate text-[9px] font-bold leading-tight text-[var(--color-primary)] sm:text-[10px]" title={`${preview.projectCode || preview.activityName} · ${formatStatus(preview.status)}`}>
                   {preview.projectCode || preview.activityName}
                 </span>
               )}

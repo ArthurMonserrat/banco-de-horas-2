@@ -6,6 +6,7 @@ import { formatMinutes } from '../time-entries/domain'
 import type { SupervisorPendingEntry } from '../supervisor/types'
 import { MonthlyCalendar, type CalendarDayPreview } from './MonthlyCalendar'
 import type { CalendarVisualState, DailySummary } from './types'
+import { formatStatus } from '../status/presentation'
 
 type Collaborator = { id: string; name: string; supervisorId?: string }
 type Supervisor = { id: string; name: string }
@@ -141,7 +142,7 @@ export function ManagerCalendar({ entries, collaborators, supervisors = [], role
             <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
               <div><dt className="font-bold text-[var(--color-text-muted)]">Projeto / atividade</dt><dd className="mt-1 font-semibold text-[var(--color-text)]">{openedPreview.projectCode || openedPreview.activityName}</dd></div>
               <div><dt className="font-bold text-[var(--color-text-muted)]">Horas</dt><dd className="mt-1 font-semibold text-[var(--color-text)]">{formatMinutes(openedPreview.durationMinutes)}</dd></div>
-              <div><dt className="font-bold text-[var(--color-text-muted)]">Status</dt><dd className="mt-1 font-semibold text-[var(--color-text)]">{openedPreview.status}</dd></div>
+              <div><dt className="font-bold text-[var(--color-text-muted)]">Status</dt><dd className="mt-1 font-semibold text-[var(--color-text)]">{formatStatus(openedPreview.status)}</dd></div>
             </dl>
             <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3 text-sm leading-6 text-[var(--color-text)]">
               <p className="font-bold text-[var(--color-text-muted)]">Detalhamento</p>

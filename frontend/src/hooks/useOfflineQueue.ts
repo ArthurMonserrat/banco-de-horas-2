@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useMsal } from '@azure/msal-react'
+import { InteractionStatus } from '@azure/msal-browser'
+import { isMsalConfigured, loginRequest } from '../config/msalConfig'
 import {
   OFFLINE_QUEUE_CHANGED_EVENT,
   offlineQueueService,
@@ -29,6 +32,7 @@ export function useOfflineQueue() {
 
 export function useOfflineAutoSync() {
   const { isOnline } = useNetworkStatus()
+  const { instance, accounts, inProgress } = useMsal()
   const queue = useOfflineQueue()
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -38,14 +42,28 @@ export function useOfflineAutoSync() {
     setIsSyncing(true)
     setSyncError(null)
     try {
-      const result = await offlineQueueService.sync()
+      let accessToken: string | undefined
+      const activeAccount = instance.getActiveAccount() ?? accounts[0]
+      if (isMsalConfigured && activeAccount) {
+        if (inProgress !== InteractionStatus.None) return
+        try {
+          const tokenResponse = await instance.acquireTokenSilent({ ...loginRequest, account: activeAccount })
+          if (!tokenResponse.accessToken) throw new Error('A Microsoft não devolveu um token de acesso válido.')
+          accessToken = tokenResponse.accessToken
+        } catch (error) {
+          console.error('Não foi possível renovar a sessão Microsoft antes da sincronização offline.', error)
+          setSyncError('A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.')
+          return
+        }
+      }
+      const result = await offlineQueueService.sync(accessToken)
       if (result.remaining > 0) setSyncError('Ainda existem apontamentos aguardando sincronização.')
     } catch {
       setSyncError('Não foi possível sincronizar os apontamentos pendentes.')
     } finally {
       setIsSyncing(false)
     }
-  }, [isOnline, isSyncing])
+  }, [accounts, inProgress, instance, isOnline, isSyncing])
 
   useEffect(() => {
     if (!isOnline || queue.length === 0) return

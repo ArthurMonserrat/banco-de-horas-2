@@ -84,11 +84,12 @@ export function clearApiSession() {
   window.localStorage.removeItem(API_SESSION_STORAGE_KEY)
 }
 
-async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function apiFetch<T>(path: string, init: RequestInit = {}, accessToken?: string): Promise<T> {
   const session = readApiSession()
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
-  if (session?.token) headers.set('Authorization', `Bearer ${session.token}`)
+  const token = accessToken ?? session?.token
+  if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const response = await fetch(path, { ...init, headers })
   const body = await response.json().catch(() => ({})) as unknown
@@ -123,11 +124,11 @@ export const backendApi = {
     return apiFetch<{ apontamentos: ApiApontamento[] }>('/api/apontamentos')
   },
 
-  async createApontamento(input: CreateApiApontamentoInput) {
+  async createApontamento(input: CreateApiApontamentoInput, accessToken?: string) {
     return apiFetch<{ apontamento: ApiApontamento }>('/api/apontamentos', {
       method: 'POST',
       body: JSON.stringify(input),
-    })
+    }, accessToken)
   },
 
   async updateApontamentoStatus(id: string, status: ApiStatusApontamento, justificativa?: string) {

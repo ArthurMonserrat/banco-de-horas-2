@@ -101,4 +101,15 @@ describe('offline queue de apontamentos', () => {
     )
     consoleError.mockRestore()
   })
+
+  it('encaminha o token renovado para cada envio da fila', async () => {
+    const storage = new MemoryStorage()
+    const syncApontamento = vi.fn().mockResolvedValue({})
+    const service = new OfflineQueueService({ storage, syncApontamento })
+    service.enqueueApontamento('user-1', baseEntry)
+
+    await service.sync('token-renovado')
+
+    expect(syncApontamento).toHaveBeenCalledWith(baseEntry && expect.objectContaining({ projeto: 'SMA-100' }), 'token-renovado')
+  })
 })

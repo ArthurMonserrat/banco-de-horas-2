@@ -18,7 +18,7 @@ type OfflineQueueDependencies = {
   storage: StorageLike
   createId?: () => string
   now?: () => string
-  syncApontamento?: (input: CreateApiApontamentoInput) => Promise<unknown>
+  syncApontamento?: (input: CreateApiApontamentoInput, accessToken?: string) => Promise<unknown>
 }
 
 function isTime(value: string | undefined): value is string {
@@ -82,13 +82,13 @@ export class OfflineQueueService {
   private readonly storage: StorageLike
   private readonly createId: () => string
   private readonly now: () => string
-  private readonly syncApontamento: (input: CreateApiApontamentoInput) => Promise<unknown>
+  private readonly syncApontamento: (input: CreateApiApontamentoInput, accessToken?: string) => Promise<unknown>
 
   constructor({ storage, createId, now, syncApontamento }: OfflineQueueDependencies) {
     this.storage = storage
     this.createId = createId ?? (() => crypto.randomUUID())
     this.now = now ?? (() => new Date().toISOString())
-    this.syncApontamento = syncApontamento ?? ((input) => backendApi.createApontamento(input))
+    this.syncApontamento = syncApontamento ?? ((input, accessToken) => backendApi.createApontamento(input, accessToken))
   }
 
   list(): OfflineQueueItem[] {
@@ -116,11 +116,11 @@ export class OfflineQueueService {
     this.write(this.list().filter((item) => item.id !== id))
   }
 
-  async sync() {
+  async sync(accessToken?: string) {
     const results = { synced: 0, remaining: 0 }
     for (const item of this.list()) {
       try {
-        await this.syncApontamento(item.apiPayload)
+        await this.syncApontamento(item.apiPayload, accessToken)
         this.remove(item.id)
         results.synced += 1
       } catch (error) {

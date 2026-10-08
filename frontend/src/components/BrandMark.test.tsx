@@ -18,4 +18,11 @@ describe('BrandMark', () => {
     expect(markup).not.toContain('<img')
     expect(markup).toContain('SM&amp;A')
   })
+
+  it('permite renderizar a logo do PWA sem a moldura branca', () => {
+    const markup = renderToStaticMarkup(<BrandMark src="/logo.png" variant="full" transparent />)
+
+    expect(markup).toContain('src="/logo.png"')
+    expect(markup).toContain('brand-mark--transparent')
+  })
 })

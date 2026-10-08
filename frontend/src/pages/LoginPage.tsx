@@ -34,6 +34,8 @@ const DEMO_PROFILE_CARDS: readonly DemoProfileCard[] = [
   },
 ]
 
+const appLogo = `${import.meta.env.BASE_URL}logo.png`
+
 type LoginPageContentProps = {
   from: unknown
   signIn: SessionContextValue['signIn']
@@ -55,7 +57,7 @@ export function LoginPageContent({ from, signIn, authError, navigate }: LoginPag
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <section className="w-full max-w-6xl" aria-labelledby="demo-login-title">
         <header className="mx-auto mb-10 flex max-w-2xl flex-col items-center text-center">
-          <BrandMark variant="full" className="mb-7" />
+          <BrandMark variant="full" src={appLogo} transparent className="mb-7" />
           <p className="ui-badge-secondary">Banco de horas 2: Campo e Estudos</p>
           <h1 id="demo-login-title" className="mt-4 text-3xl font-extrabold text-[var(--color-primary)] sm:text-4xl">
             Escolha seu perfil

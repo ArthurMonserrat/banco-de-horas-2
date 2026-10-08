@@ -12,11 +12,13 @@ const { useProfileMock } = vi.hoisted(() => ({ useProfileMock: vi.fn() }))
 vi.mock('../collaborator/useProfile', () => ({ useProfile: useProfileMock }))
 
 describe('interface de perfil profissional', () => {
-  it('exibe status, localização controlada, squad, supervisor e carga vigente', () => {
+  it('exibe status, squad, supervisor e carga vigente sem o campo de localização', () => {
     const markup = renderToStaticMarkup(<ProfileSummary profile={demoCollaborator} assignment={demoAssignmentSnapshot} currentWorkload={demoWorkloadVersions[0]} />)
-    for (const text of ['Ativo', 'São Paulo', 'Engenharia de Automação', 'Jeen Carlos E. Azevedo', '08:00']) expect(markup).toContain(text)
+    for (const text of ['Ativo', 'Engenharia de Automação', 'Jeen Carlos E. Azevedo', '08:00']) expect(markup).toContain(text)
+    expect(markup).not.toContain('Localização')
     expect(markup).toContain('Use &quot;Editar Perfil&quot;')
-    expect(markup).toContain('Localização e status seguem controlados pela empresa')
+    expect(markup).toContain('O status segue controlado pela empresa')
+    expect(markup.match(/Dados profissionais/g)).toBeNull()
   })
 
   it('permite escolher somente squad e informa que o supervisor é automático', () => {

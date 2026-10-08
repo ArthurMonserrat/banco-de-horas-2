@@ -15,15 +15,13 @@ export function ProfileSummary({ profile, assignment, currentWorkload }: Profile
     ['E-mail', profile.email],
     ['Cargo', profile.jobTitle],
     ['Status', profile.active ? 'Ativo' : 'Inativo'],
-    ['Localização', `${profile.location.city} · ${profile.location.stateCode}`],
     ['Squad atual', assignment?.squadName ?? 'Não definida'],
     ['Supervisor responsável', assignment?.supervisorName ?? 'Não definido'],
     ['Carga diária vigente', currentWorkload ? formatMinutes(currentWorkload.dailyMinutes) : 'Não cadastrada'],
   ]
 
   return (
-    <section className="space-y-4" aria-labelledby="profile-summary-title">
-      <h2 id="profile-summary-title" className="text-lg font-extrabold ui-heading">Dados profissionais</h2>
+    <section className="space-y-4" aria-label="Resumo dos dados profissionais">
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {items.map(([label, value]) => (
           <div key={label} className="rounded-xl ui-surface-subtle p-4">
@@ -33,7 +31,7 @@ export function ProfileSummary({ profile, assignment, currentWorkload }: Profile
         ))}
       </dl>
       <p className="rounded-xl border ui-callout-secondary p-4 text-sm ui-text">
-        Use "Editar Perfil" para atualizar nome, e-mail, cargo e squad. Localização e status seguem controlados pela empresa.
+        Use "Editar Perfil" para atualizar nome, e-mail, cargo e squad. O status segue controlado pela empresa.
       </p>
     </section>
   )

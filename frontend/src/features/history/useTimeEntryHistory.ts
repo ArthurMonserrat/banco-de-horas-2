@@ -201,9 +201,20 @@ export function useTimeEntryHistory(focusDate?: string) {
     await load()
   }
 
+  const clearAll = async () => {
+    await timeEntryService.clearAll()
+    setRows([])
+    setTotal(0)
+    setNextCursor(null)
+    setPeriodSummary(null)
+    setPeriodEvents([])
+    setPeriodTimeOffRequests([])
+    setFeedback('Histórico de apontamentos limpo com sucesso.')
+  }
+
   return {
     draftFilters, setDraftFilters, applyFilters, rows, total, isLoading, error, feedback,
-    periodSummary, periodEvents, periodTimeOffRequests,
+    periodSummary, periodEvents, periodTimeOffRequests, clearAll,
     nextCursor, hasPreviousPage: cursorHistory.length > 0, nextPage, previousPage, cancel, completeCorrection, reload: load,
   }
 }

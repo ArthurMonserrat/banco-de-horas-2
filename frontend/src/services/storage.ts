@@ -1,6 +1,7 @@
 export interface StorageLike {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
+  removeItem?(key: string): void
 }
 
 function createMemoryStorage(): StorageLike {
@@ -8,6 +9,7 @@ function createMemoryStorage(): StorageLike {
   return {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => { values.set(key, value) },
+    removeItem: (key) => { values.delete(key) },
   }
 }
 
@@ -57,6 +59,17 @@ export function createResilientStorage(
         pendingWrites.delete(key)
       } catch (error) {
         pendingWrites.add(key)
+        onError('write', error)
+      }
+    },
+    removeItem(key) {
+      if (fallback.removeItem) fallback.removeItem(key)
+      const resolved = getPrimary()
+      if (!resolved?.removeItem) return
+      try {
+        resolved.removeItem(key)
+        pendingWrites.delete(key)
+      } catch (error) {
         onError('write', error)
       }
     },

@@ -22,6 +22,10 @@ class MemoryStorage implements StorageLike {
     this.values.set(key, value)
     this.writes.set(key, (this.writes.get(key) ?? 0) + 1)
   }
+
+  removeItem(key: string) {
+    this.values.delete(key)
+  }
 }
 
 class CorruptingV3Storage extends MemoryStorage {
@@ -311,6 +315,21 @@ describe('comandos e consultas de apontamento', () => {
     expect(TIME_ENTRY_STORAGE_KEY).toBe('apontamentos_sma')
     expect(storage.getItem(TIME_ENTRY_STORAGE_KEY)).toContain('stable-entry-id')
     expect(storage.getItem('sma:time-entries:v3')).toBeNull()
+  })
+
+  it('limpa os apontamentos atuais e as chaves legadas sem permitir reidratação', async () => {
+    const storage = new MemoryStorage()
+    const service = buildService(storage)
+    await service.create(collaboratorId, validData)
+    storage.setItem(LEGACY_V1_TIME_ENTRY_STORAGE_KEY, JSON.stringify({ entries: [] }))
+    storage.setItem(LEGACY_V2_TIME_ENTRY_STORAGE_KEY, JSON.stringify({ version: 2, entriesByCollaborator: {} }))
+
+    await service.clearAll()
+
+    expect(await service.listByRange(collaboratorId, '2026-01-01', '2026-12-31')).toEqual([])
+    expect(storage.getItem(TIME_ENTRY_STORAGE_KEY)).toBeNull()
+    expect(storage.getItem(LEGACY_V1_TIME_ENTRY_STORAGE_KEY)).toBeNull()
+    expect(storage.getItem(LEGACY_V2_TIME_ENTRY_STORAGE_KEY)).toBeNull()
   })
 
   it('cria múltiplos registros para um período e preserva o lançamento único', async () => {

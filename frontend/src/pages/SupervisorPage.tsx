@@ -20,6 +20,7 @@ import { getCorporateToday, getTimesheetCycle, isIsoDate } from '../shared/utils
 import { getAllColaboradores } from '../data/mockDEP'
 import { AvisosPage } from './AvisosPage'
 import { NavigationIcon, type NavigationIconName } from '../components/NavigationIcon'
+import { timeEntryService } from '../services/timeEntryService'
 
 type ActiveView = 'entries' | 'requests' | 'history' | 'profile' | 'announcements'
 type EntryStatusFilter = 'ALL' | SupervisorPendingEntry['status']
@@ -147,7 +148,7 @@ function SupervisorSidebar({ activeView, profile, onChange, onSignOut }: {
   )
 }
 
-function HistoryView({ entries }: { entries: SupervisorPendingEntry[] }) {
+function HistoryView({ entries, onClearHistory }: { entries: SupervisorPendingEntry[], onClearHistory: () => Promise<void> }) {
   const [filters, setFilters] = useState<SupervisorHistoryFilters>({
     technician: '',
     project: 'Todos',
@@ -155,6 +156,8 @@ function HistoryView({ entries }: { entries: SupervisorPendingEntry[] }) {
     endDate: '',
     status: 'ALL',
   })
+  const [isClearing, setIsClearing] = useState(false)
+  const [clearError, setClearError] = useState<string | null>(null)
   const filteredEntries = useMemo(() => filterSupervisorHistoryEntries(entries, filters), [entries, filters])
   const projectOptions = useMemo(() => ['Todos', ...Array.from(new Set(entries.map((entry) => entry.projectCode))).sort()], [entries])
 
@@ -166,12 +169,29 @@ function HistoryView({ entries }: { entries: SupervisorPendingEntry[] }) {
     setFilters({ technician: '', project: 'Todos', startDate: '', endDate: '', status: 'ALL' })
   }
 
+  async function clearHistory() {
+    if (!window.confirm('ALERTA CRÍTICO: Tem certeza que deseja apagar TODO o histórico de apontamentos? Esta ação não pode ser desfeita e afetará os dados do sistema.')) return
+    setIsClearing(true)
+    setClearError(null)
+    try {
+      await onClearHistory()
+    } catch (error) {
+      console.error('Não foi possível limpar o histórico da equipe.', error)
+      setClearError('Não foi possível limpar o histórico. Tente novamente.')
+    } finally {
+      setIsClearing(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <section className="ui-card rounded-2xl p-5" aria-label="Filtros do histórico do supervisor">
-        <div className="mb-4">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">Busca rápida</p>
-          <h2 className="mt-1 text-xl font-extrabold text-[var(--color-text)]">Filtrar histórico</h2>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">Busca rápida</p>
+            <h2 className="mt-1 text-xl font-extrabold text-[var(--color-text)]">Filtrar histórico</h2>
+          </div>
+          <button type="button" onClick={() => void clearHistory()} disabled={isClearing} className="self-start rounded-xl border border-red-400 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-50 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400/70 dark:text-red-300 dark:hover:bg-red-950/40 sm:self-auto">{isClearing ? 'Limpando...' : 'Limpar Histórico'}</button>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
           <label className="text-sm font-bold ui-text">
@@ -204,6 +224,8 @@ function HistoryView({ entries }: { entries: SupervisorPendingEntry[] }) {
           <button type="button" onClick={clearFilters} className="self-end rounded-xl border ui-border px-4 py-2.5 text-sm font-bold ui-text transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]">Limpar Filtros</button>
         </div>
       </section>
+
+      {clearError && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">{clearError}</p>}
 
       <section className="ui-card rounded-2xl p-5" aria-labelledby="supervisor-history-title">
         <div className="mb-4">
@@ -404,6 +426,12 @@ export function SupervisorPage() {
   function updateSupervisorProfile(profile: SupervisorProfile) {
     saveSupervisorProfile(profile)
     setSupervisorProfile(profile)
+  }
+
+  async function clearSupervisorHistory() {
+    await timeEntryService.clearAll()
+    setSelectedIds([])
+    await dashboard.reload()
   }
 
   async function handleExportToExcel() {
@@ -698,7 +726,7 @@ export function SupervisorPage() {
               </>
             )}
 
-            {activeView === 'history' && <HistoryView entries={dashboard.entries} />}
+            {activeView === 'history' && <HistoryView entries={dashboard.entries} onClearHistory={clearSupervisorHistory} />}
             {activeView === 'profile' && <SupervisorProfileView profile={supervisorProfile} onSave={updateSupervisorProfile} />}
             {activeView === 'announcements' && <AvisosPage />}
           </div>

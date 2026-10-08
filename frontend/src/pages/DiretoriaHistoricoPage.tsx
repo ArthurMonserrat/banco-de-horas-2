@@ -3,6 +3,7 @@ import { PageContainer } from '../components/PageContainer'
 import { filterDirectorHistoryRows, type DirectorHistoryFilters, type DirectorHistoryStatusFilter } from '../features/director/directorHistoryFilters'
 import { supervisorService } from '../services/supervisorService'
 import { buildReportRows, type ReportRow } from '../services/reportService'
+import { timeEntryService } from '../services/timeEntryService'
 
 const statusLabel: Record<ReportRow['status'], string> = {
   APPROVED: 'Aprovado',
@@ -28,6 +29,7 @@ export function DiretoriaHistoricoPage() {
   const [draftFilters, setDraftFilters] = useState<DirectorHistoryFilters>(initialFilters)
   const [appliedFilters, setAppliedFilters] = useState<DirectorHistoryFilters>(initialFilters)
   const [isLoading, setIsLoading] = useState(true)
+  const [isClearing, setIsClearing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -70,13 +72,31 @@ export function DiretoriaHistoricoPage() {
     setAppliedFilters(initialFilters)
   }
 
+  async function clearHistory() {
+    if (!window.confirm('ALERTA CRÍTICO: Tem certeza que deseja apagar TODO o histórico de apontamentos? Esta ação não pode ser desfeita e afetará os dados do sistema.')) return
+    setIsClearing(true)
+    try {
+      await timeEntryService.clearAll()
+      setRows([])
+      setError(null)
+    } catch (clearError) {
+      console.error('Não foi possível limpar o histórico global.', clearError)
+      setError('Não foi possível limpar o histórico. Tente novamente.')
+    } finally {
+      setIsClearing(false)
+    }
+  }
+
   return (
     <PageContainer title="Histórico" description="Visão global dos apontamentos da SM&A, com filtros por equipe, colaborador, projeto, período e status." contained={false}>
       <div className="space-y-6">
         <section className="ui-card rounded-2xl p-5" aria-label="Filtros globais do histórico da diretoria">
-          <div className="mb-4">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">Consulta global</p>
-            <h2 className="mt-1 text-xl font-extrabold ui-text">Filtrar apontamentos</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">Consulta global</p>
+              <h2 className="mt-1 text-xl font-extrabold ui-text">Filtrar apontamentos</h2>
+            </div>
+            <button type="button" onClick={() => void clearHistory()} disabled={isClearing} className="self-start rounded-xl border border-red-400 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-50 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400/70 dark:text-red-300 dark:hover:bg-red-950/40 sm:self-auto">{isClearing ? 'Limpando...' : 'Limpar Histórico'}</button>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1.2fr_1fr_1fr_1fr_1fr_auto_auto]">
             <label className="text-sm font-bold ui-text">

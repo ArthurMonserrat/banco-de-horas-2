@@ -35,6 +35,7 @@ export function TimeEntryHistory() {
   const [cancelTarget, setCancelTarget] = useState<HistoryRow | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
+  const [clearError, setClearError] = useState<string | null>(null)
   const { profile } = useSession()
   const offlineSync = useOfflineAutoSync()
   const pendingQueue = offlineSync.queue.filter((item) => item.collaboratorId === profile?.id)
@@ -56,9 +57,26 @@ export function TimeEntryHistory() {
     }
   }
 
+  const handleClearHistory = async () => {
+    if (!window.confirm('ALERTA CRÍTICO: Tem certeza que deseja apagar TODO o histórico de apontamentos? Esta ação não pode ser desfeita e afetará os dados do sistema.')) return
+    setClearError(null)
+    try {
+      await history.clearAll()
+    } catch (error) {
+      console.error('Não foi possível limpar o histórico do colaborador.', error)
+      setClearError('Não foi possível limpar o histórico. Tente novamente.')
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <HistoryFilters value={history.draftFilters} onChange={history.setDraftFilters} onApply={history.applyFilters} />
+      <div className="space-y-3">
+        <HistoryFilters value={history.draftFilters} onChange={history.setDraftFilters} onApply={history.applyFilters} />
+        <div className="flex justify-end">
+          <button type="button" onClick={() => void handleClearHistory()} className="rounded-xl border border-red-400 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-50 hover:text-red-800 dark:border-red-400/70 dark:text-red-300 dark:hover:bg-red-950/40">Limpar Histórico</button>
+        </div>
+      </div>
+      {clearError && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">{clearError}</p>}
       {history.feedback && <p role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">{history.feedback}</p>}
       {history.error && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"><p>{history.error}</p><button type="button" onClick={() => void history.reload()} className="mt-2 font-bold underline">Tentar novamente</button></div>}
       {history.isLoading && <p aria-live="polite" className="rounded-2xl ui-surface p-8 text-center font-semibold ui-text-muted">Carregando histórico…</p>}

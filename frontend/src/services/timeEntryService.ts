@@ -67,6 +67,7 @@ export interface TimeEntryService {
   update(collaboratorId: string, id: string, expectedVersion: number, data: CreateTimeEntryData, reason: string): Promise<TimeEntry>
   duplicate(collaboratorId: string, id: string, expectedVersion: number, overrides: Partial<CreateTimeEntryData>): Promise<TimeEntry>
   cancel(collaboratorId: string, id: string, expectedVersion: number, reason: string): Promise<TimeEntry>
+  clearAll(): Promise<void>
   getDailySummary(collaboratorId: string, date: string, workloadVersions: WorkloadVersion[]): Promise<DailySummary>
 }
 
@@ -513,6 +514,14 @@ export class LocalStorageTimeEntryService implements TimeEntryService {
       timeOffRequests: [],
       workloadVersions,
     })
+  }
+
+  async clearAll() {
+    const keys = [TIME_ENTRY_STORAGE_KEY, LEGACY_V3_TIME_ENTRY_STORAGE_KEY, LEGACY_V2_TIME_ENTRY_STORAGE_KEY, LEGACY_V1_TIME_ENTRY_STORAGE_KEY]
+    for (const key of keys) {
+      if (this.storage.removeItem) this.storage.removeItem(key)
+      else this.storage.setItem(key, JSON.stringify(emptyStorage()))
+    }
   }
 }
 

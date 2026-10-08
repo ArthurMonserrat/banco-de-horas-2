@@ -68,11 +68,12 @@ describe('offline queue de apontamentos', () => {
     })
   })
 
-  it('remove da fila somente os itens sincronizados com sucesso', async () => {
+  it('continua processando a fila quando um item falha e mantém o item com erro', async () => {
     const storage = new MemoryStorage()
     const syncApontamento = vi.fn()
+      .mockRejectedValueOnce(new Error('erro 500: sem conexão'))
       .mockResolvedValueOnce({})
-      .mockRejectedValueOnce(new Error('sem conexão'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const service = new OfflineQueueService({
       storage,
       createId: vi.fn()
@@ -88,6 +89,16 @@ describe('offline queue de apontamentos', () => {
 
     expect(result).toEqual({ synced: 1, remaining: 1 })
     expect(service.list()).toHaveLength(1)
-    expect(service.list()[0].id).toBe('offline-2')
+    expect(service.list()[0].id).toBe('offline-1')
+    expect(syncApontamento).toHaveBeenCalledTimes(2)
+    expect(consoleError).toHaveBeenCalledWith(
+      'Falha ao sincronizar apontamento offline.',
+      expect.objectContaining({
+        id: 'offline-1',
+        payload: expect.objectContaining({ projeto: 'SMA-100' }),
+        error: expect.any(Error),
+      }),
+    )
+    consoleError.mockRestore()
   })
 })

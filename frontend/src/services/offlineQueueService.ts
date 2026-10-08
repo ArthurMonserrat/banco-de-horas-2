@@ -1,5 +1,5 @@
 import type { CreateTimeEntryData } from '../features/time-entries/types'
-import { backendApi, type CreateApiApontamentoInput } from './api'
+import { ApiRequestError, backendApi, type CreateApiApontamentoInput } from './api'
 import { createBrowserStorage, type StorageLike } from './storage'
 
 export const OFFLINE_QUEUE_STORAGE_KEY = '@sma_offline_queue'
@@ -123,8 +123,14 @@ export class OfflineQueueService {
         await this.syncApontamento(item.apiPayload)
         this.remove(item.id)
         results.synced += 1
-      } catch {
-        break
+      } catch (error) {
+        console.error('Falha ao sincronizar apontamento offline.', {
+          id: item.id,
+          payload: item.apiPayload,
+          status: error instanceof ApiRequestError ? error.status : undefined,
+          response: error instanceof ApiRequestError ? error.responseBody : undefined,
+          error,
+        })
       }
     }
     results.remaining = this.list().length

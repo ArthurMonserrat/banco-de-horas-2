@@ -49,6 +49,18 @@ export type ApiSession = {
   user: ApiUser
 }
 
+export class ApiRequestError extends Error {
+  readonly status: number
+  readonly responseBody: unknown
+
+  constructor(message: string, status: number, responseBody: unknown) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.responseBody = responseBody
+  }
+}
+
 function readApiSession(): ApiSession | null {
   if (typeof window === 'undefined') return null
   try {
@@ -84,7 +96,7 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     const message = body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
       ? body.error
       : 'Não foi possível comunicar com o servidor.'
-    throw new Error(message)
+    throw new ApiRequestError(message, response.status, body)
   }
   return body as T
 }

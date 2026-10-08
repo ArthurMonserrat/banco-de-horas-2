@@ -16,7 +16,7 @@ import { getHistoryEntryActions } from './entryActions'
 import { EntryRevisionBadge, EntryRevisionDetails } from '../time-entries/EntryRevisionBadge'
 import { StatusBadge } from '../../components/StatusBadge'
 import { approvalStatusPresentation, nonApplicableApprovalPresentation, timeEntryStatusPresentation } from '../status/presentation'
-import { useOfflineQueue } from '../../hooks/useOfflineQueue'
+import { useOfflineAutoSync } from '../../hooks/useOfflineQueue'
 import { useSession } from '../session/useSession'
 
 const activityOptions = [
@@ -35,7 +35,8 @@ export function TimeEntryHistory() {
   const [cancelReason, setCancelReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
   const { profile } = useSession()
-  const pendingQueue = useOfflineQueue().filter((item) => item.collaboratorId === profile?.id)
+  const offlineSync = useOfflineAutoSync()
+  const pendingQueue = offlineSync.queue.filter((item) => item.collaboratorId === profile?.id)
 
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return
@@ -63,8 +64,20 @@ export function TimeEntryHistory() {
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-200">Modo Offline</p>
               <h2 id="offline-pending-title" className="mt-1 text-lg font-extrabold">A aguardar sincronização</h2>
             </div>
-            <span className="rounded-full border border-amber-300/50 px-3 py-1 text-xs font-bold">{pendingQueue.length} pendente(s)</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-amber-300/50 px-3 py-1 text-xs font-bold">{pendingQueue.length} pendente(s)</span>
+              <button
+                type="button"
+                onClick={() => void offlineSync.syncNow()}
+                disabled={!offlineSync.isOnline || offlineSync.isSyncing}
+                className="rounded-lg border border-amber-200/60 px-3 py-1.5 text-xs font-extrabold transition hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                title={!offlineSync.isOnline ? 'A sincronização exige conexão com a internet.' : undefined}
+              >
+                {offlineSync.isSyncing ? 'Sincronizando...' : '🔄 Forçar Sincronização'}
+              </button>
+            </div>
           </div>
+          {offlineSync.syncError && <p role="alert" className="mt-3 text-sm font-semibold text-amber-100">{offlineSync.syncError}</p>}
           <div className="mt-4 grid gap-3">
             {pendingQueue.map((item) => {
               const client = demoClients.find((clientOption) => clientOption.id === item.entry.clientId)?.name ?? 'Cliente não disponível'

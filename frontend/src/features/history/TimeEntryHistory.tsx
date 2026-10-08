@@ -68,7 +68,7 @@ export function TimeEntryHistory() {
               <span className="rounded-full border border-amber-300/50 px-3 py-1 text-xs font-bold">{pendingQueue.length} pendente(s)</span>
               <button
                 type="button"
-                onClick={() => void offlineSync.syncNow()}
+                onClick={() => void offlineSync.syncNow({ interactive: true })}
                 disabled={!offlineSync.isOnline || offlineSync.isSyncing}
                 className="rounded-lg border border-amber-200/60 px-3 py-1.5 text-xs font-extrabold transition hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50"
                 title={!offlineSync.isOnline ? 'A sincronização exige conexão com a internet.' : undefined}

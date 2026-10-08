@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useMsal } from '@azure/msal-react'
 import { InteractionStatus } from '@azure/msal-browser'
 import { isMsalConfigured, loginRequest } from '../config/msalConfig'
-import { backendApi, getApiSessionToken } from '../services/api'
+import { ApiRequestError, backendApi, getApiSessionToken } from '../services/api'
 import {
   OFFLINE_QUEUE_CHANGED_EVENT,
   offlineQueueService,
@@ -12,6 +12,17 @@ import { useNetworkStatus } from './useNetworkStatus'
 
 function readQueue() {
   return offlineQueueService.list()
+}
+
+const SESSION_EXPIRED_MESSAGE = 'A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.'
+const REAUTH_MESSAGE = 'A sua sessão expirou. Confirme o seu login na janela da Microsoft para enviar os apontamentos.'
+
+export type OfflineSyncOptions = {
+  interactive?: boolean
+}
+
+function isUnauthorized(error: unknown) {
+  return error instanceof ApiRequestError && error.status === 401
 }
 
 export function useOfflineQueue() {
@@ -38,40 +49,56 @@ export function useOfflineAutoSync() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
 
-  const syncNow = useCallback(async () => {
+  const syncNow = useCallback(async ({ interactive = false }: OfflineSyncOptions = {}) => {
     if (!isOnline || isSyncing || offlineQueueService.list().length === 0) return
     setIsSyncing(true)
     setSyncError(null)
+    let hasRetriedAfterLogin = false
     try {
-      let accessToken = getApiSessionToken() ?? ''
-      const activeAccount = instance.getActiveAccount() ?? accounts[0]
-      if (isMsalConfigured && activeAccount) {
-        if (inProgress !== InteractionStatus.None) return
+      while (true) {
+        let msalAuthenticationFailed = false
         try {
-          const tokenResponse = await instance.acquireTokenSilent({ ...loginRequest, account: activeAccount })
-          if (!tokenResponse.accessToken) throw new Error('A Microsoft não devolveu um token de acesso válido.')
-          accessToken = tokenResponse.accessToken
+          let accessToken = getApiSessionToken() ?? ''
+          const activeAccount = instance.getActiveAccount() ?? accounts[0]
+          if (isMsalConfigured && activeAccount) {
+            if (inProgress !== InteractionStatus.None) {
+              setSyncError('A autenticação ainda está em andamento. Tente sincronizar novamente em instantes.')
+              return
+            }
+            try {
+              const tokenResponse = await instance.acquireTokenSilent({ ...loginRequest, account: activeAccount })
+              if (!tokenResponse.accessToken) throw new Error('A Microsoft não devolveu um token de acesso válido.')
+              accessToken = tokenResponse.accessToken
+            } catch (error) {
+              msalAuthenticationFailed = true
+              throw error
+            }
+          }
+          if (!accessToken.trim()) throw new Error('Token ausente. Sincronização interrompida.')
+          await backendApi.validateSession(accessToken)
+          const result = await offlineQueueService.sync(accessToken)
+          if (result.remaining > 0) setSyncError('Ainda existem apontamentos aguardando sincronização.')
+          return
         } catch (error) {
-          console.error('Não foi possível renovar a sessão Microsoft antes da sincronização offline.', error)
-          setSyncError('A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.')
+          const authenticationFailed = msalAuthenticationFailed || isUnauthorized(error)
+          if (interactive && authenticationFailed && !hasRetriedAfterLogin && isMsalConfigured) {
+            hasRetriedAfterLogin = true
+            setSyncError(REAUTH_MESSAGE)
+            try {
+              const response = await instance.loginPopup(loginRequest)
+              if (!response.account) throw new Error('O login Microsoft não devolveu uma conta válida.')
+              instance.setActiveAccount(response.account)
+              setSyncError(null)
+              continue
+            } catch (loginError) {
+              console.error('Não foi possível concluir a reautenticação interativa para sincronizar a fila offline.', loginError)
+            }
+          }
+          console.error('Sincronização manual interrompida antes de novos envios.', error)
+          setSyncError(authenticationFailed ? SESSION_EXPIRED_MESSAGE : 'Não foi possível sincronizar os apontamentos pendentes.')
           return
         }
       }
-      if (!accessToken.trim()) {
-        setSyncError('A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.')
-        return
-      }
-      try {
-        await backendApi.validateSession(accessToken)
-      } catch (error) {
-        console.error('Sessão rejeitada antes da sincronização offline; nenhum POST será enviado.', error)
-        setSyncError('A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.')
-        return
-      }
-      const result = await offlineQueueService.sync(accessToken)
-      if (result.remaining > 0) setSyncError('Ainda existem apontamentos aguardando sincronização.')
-    } catch {
-      setSyncError('Não foi possível sincronizar os apontamentos pendentes.')
     } finally {
       setIsSyncing(false)
     }

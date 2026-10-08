@@ -13,6 +13,7 @@ import { DiretoriaPage } from '../pages/DiretoriaPage'
 import { EquipesPage } from '../pages/EquipesPage'
 import { AvisosPage } from '../pages/AvisosPage'
 import { RelatoriosPage } from '../pages/RelatoriosPage'
+import { DiretoriaHistoricoPage } from '../pages/DiretoriaHistoricoPage'
 
 export function AppRoutes() {
   return (
@@ -31,6 +32,9 @@ export function AppRoutes() {
       <Route path="/supervisor" element={<ProtectedRoute allowedRoles={['SUPERVISOR']}><SupervisorPage /></ProtectedRoute>} />
       <Route path="/administracao" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><DiretoriaPage /></ProtectedRoute>} />
       <Route path="/administracao/equipes" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><EquipesPage /></ProtectedRoute>} />
+      <Route path="/administracao/historico" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><AppLayout /></ProtectedRoute>}>
+        <Route index element={<DiretoriaHistoricoPage />} />
+      </Route>
       <Route path="/relatorios" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><AppLayout /></ProtectedRoute>}>
         <Route index element={<RelatoriosPage />} />
       </Route>

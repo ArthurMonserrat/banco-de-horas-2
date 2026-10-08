@@ -98,6 +98,7 @@ describe('layout responsivo do colaborador', () => {
     expect(directorNavigation.map((item) => [item.label, item.icon])).toEqual([
       ['Painel Diretor', 'dashboard'],
       ['Equipes', 'users'],
+      ['Histórico', 'history'],
       ['Relatórios', 'bar-chart'],
       ['Avisos', 'bell'],
     ])

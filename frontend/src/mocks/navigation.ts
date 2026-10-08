@@ -12,6 +12,7 @@ export const collaboratorNavigation: NavigationItem[] = [
 export const directorNavigation: NavigationItem[] = [
   { label: 'Painel Diretor', icon: 'dashboard', path: '/administracao' },
   { label: 'Equipes', icon: 'users', path: '/administracao/equipes' },
+  { label: 'Histórico', icon: 'history', path: '/administracao/historico' },
   { label: 'Relatórios', icon: 'bar-chart', path: '/relatorios' },
   { label: 'Avisos', icon: 'bell', path: '/avisos' },
 ]

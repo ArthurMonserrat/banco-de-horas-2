@@ -143,6 +143,14 @@ describe('layout responsivo do colaborador', () => {
     expect(markup).toContain('Visão macro')
   })
 
+  it('não exibe o cartão de squad na sidebar da Diretoria', () => {
+    const markup = renderLayoutForSession(directorSession)
+    const sidebarStart = markup.indexOf('data-desktop-sidebar="true"')
+    const sidebarMarkup = markup.slice(sidebarStart, markup.indexOf('</aside>', sidebarStart))
+
+    expect(sidebarMarkup).not.toContain('Squad ativa')
+  })
+
   it.each([
     ['COLLABORATOR', collaboratorSession, 'ÁREA DO COLABORADOR'],
     ['SUPERVISOR', supervisorSession, 'ÁREA DA SUPERVISÃO'],

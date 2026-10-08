@@ -56,12 +56,14 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
               <p className="mt-0.5 text-xs leading-tight text-[var(--color-sidebar-text-muted)]">{sidebarProfile.jobTitle}</p>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--color-sidebar-surface)] p-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-sidebar-text-muted)]">Squad ativa</p>
-              <p className="text-xs font-bold leading-tight">{sidebarSquad}</p>
+          {!isDirector && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--color-sidebar-surface)] p-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-sidebar-text-muted)]">Squad ativa</p>
+                <p className="text-xs font-bold leading-tight">{sidebarSquad}</p>
+              </div>
             </div>
-          </div>
+          )}
         </section>
       )}
 

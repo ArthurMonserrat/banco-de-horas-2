@@ -12,6 +12,11 @@ type TokenPayload = {
   iat: number
 }
 
+type TokenValidation = {
+  payload: TokenPayload | null
+  reason: string | null
+}
+
 function base64UrlEncode(input: string) {
   return Buffer.from(input).toString('base64url')
 }
@@ -35,28 +40,40 @@ export function createSessionToken(user: Pick<User, 'id' | 'perfil'>) {
 }
 
 export function verifySessionToken(token: string): TokenPayload | null {
+  return validateSessionToken(token).payload
+}
+
+function validateSessionToken(token: string): TokenValidation {
   const [encodedPayload, signature] = token.split('.')
-  if (!encodedPayload || !signature) return null
+  if (!encodedPayload || !signature) return { payload: null, reason: 'formato do token inválido' }
   const expectedSignature = signPayload(encodedPayload)
   const signatureBuffer = Buffer.from(signature)
   const expectedBuffer = Buffer.from(expectedSignature)
-  if (signatureBuffer.length !== expectedBuffer.length || !timingSafeEqual(signatureBuffer, expectedBuffer)) return null
+  if (signatureBuffer.length !== expectedBuffer.length || !timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    return { payload: null, reason: 'assinatura HMAC inválida (token MSAL/JWT não é aceito por esta API)' }
+  }
   try {
     const payload = JSON.parse(base64UrlDecode(encodedPayload)) as Partial<TokenPayload>
-    if (!payload.sub || !payload.perfil || !payload.iat) return null
-    return payload as TokenPayload
+    if (!payload.sub || !payload.perfil || !payload.iat) return { payload: null, reason: 'payload incompleto' }
+    return { payload: payload as TokenPayload, reason: null }
   } catch {
-    return null
+    return { payload: null, reason: 'payload não é JSON válido' }
   }
 }
 
 export async function requireApiUser(request: ApiRequest): Promise<AuthenticatedUser | null> {
   const token = getBearerToken(request)
-  if (!token) return null
-  const payload = verifySessionToken(token)
-  if (!payload) return null
+  if (!token) {
+    console.warn('[auth] Sessão rejeitada: Bearer token ausente.')
+    return null
+  }
+  const validation = validateSessionToken(token)
+  if (!validation.payload) {
+    console.warn(`[auth] Sessão rejeitada: ${validation.reason ?? 'token inválido'}.`)
+    return null
+  }
   return prisma.user.findUnique({
-    where: { id: payload.sub },
+    where: { id: validation.payload.sub },
     select: { id: true, nome: true, email: true, perfil: true, supervisorId: true },
   })
 }

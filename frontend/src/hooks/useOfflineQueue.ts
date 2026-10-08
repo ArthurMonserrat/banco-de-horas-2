@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useMsal } from '@azure/msal-react'
 import { InteractionStatus } from '@azure/msal-browser'
 import { isMsalConfigured, loginRequest } from '../config/msalConfig'
+import { backendApi, getApiSessionToken } from '../services/api'
 import {
   OFFLINE_QUEUE_CHANGED_EVENT,
   offlineQueueService,
@@ -42,7 +43,7 @@ export function useOfflineAutoSync() {
     setIsSyncing(true)
     setSyncError(null)
     try {
-      let accessToken: string | undefined
+      let accessToken = getApiSessionToken() ?? ''
       const activeAccount = instance.getActiveAccount() ?? accounts[0]
       if (isMsalConfigured && activeAccount) {
         if (inProgress !== InteractionStatus.None) return
@@ -55,6 +56,17 @@ export function useOfflineAutoSync() {
           setSyncError('A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.')
           return
         }
+      }
+      if (!accessToken.trim()) {
+        setSyncError('A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.')
+        return
+      }
+      try {
+        await backendApi.validateSession(accessToken)
+      } catch (error) {
+        console.error('Sessão rejeitada antes da sincronização offline; nenhum POST será enviado.', error)
+        setSyncError('A sua sessão expirou. Por favor, faça login novamente para sincronizar os dados.')
+        return
       }
       const result = await offlineQueueService.sync(accessToken)
       if (result.remaining > 0) setSyncError('Ainda existem apontamentos aguardando sincronização.')

@@ -84,6 +84,10 @@ export function clearApiSession() {
   window.localStorage.removeItem(API_SESSION_STORAGE_KEY)
 }
 
+export function getApiSessionToken() {
+  return readApiSession()?.token ?? null
+}
+
 async function apiFetch<T>(path: string, init: RequestInit = {}, accessToken?: string): Promise<T> {
   const session = readApiSession()
   const headers = new Headers(init.headers)
@@ -112,8 +116,8 @@ export const backendApi = {
     return session
   },
 
-  async validateSession() {
-    return apiFetch<{ user: ApiUser }>('/api/auth')
+  async validateSession(accessToken?: string) {
+    return apiFetch<{ user: ApiUser }>('/api/auth', {}, accessToken)
   },
 
   async listUsers() {

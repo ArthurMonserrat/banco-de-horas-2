@@ -85,7 +85,7 @@ describe('offline queue de apontamentos', () => {
     service.enqueueApontamento('user-1', baseEntry)
     service.enqueueApontamento('user-1', { ...baseEntry, entryDate: '2026-09-29' })
 
-    const result = await service.sync()
+    const result = await service.sync('token-valido')
 
     expect(result).toEqual({ synced: 1, remaining: 1 })
     expect(service.list()).toHaveLength(1)
@@ -110,6 +110,16 @@ describe('offline queue de apontamentos', () => {
 
     await service.sync('token-renovado')
 
-    expect(syncApontamento).toHaveBeenCalledWith(baseEntry && expect.objectContaining({ projeto: 'SMA-100' }), 'token-renovado')
+    expect(syncApontamento).toHaveBeenCalledWith(expect.objectContaining({ projeto: 'SMA-100' }), 'token-renovado')
+  })
+
+  it('não inicia nenhum POST quando o token está ausente', async () => {
+    const storage = new MemoryStorage()
+    const syncApontamento = vi.fn().mockResolvedValue({})
+    const service = new OfflineQueueService({ storage, syncApontamento })
+    service.enqueueApontamento('user-1', baseEntry)
+
+    await expect(service.sync('')).rejects.toThrow('Token ausente')
+    expect(syncApontamento).not.toHaveBeenCalled()
   })
 })

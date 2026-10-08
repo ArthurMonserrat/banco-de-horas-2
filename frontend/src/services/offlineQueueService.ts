@@ -116,7 +116,8 @@ export class OfflineQueueService {
     this.write(this.list().filter((item) => item.id !== id))
   }
 
-  async sync(accessToken?: string) {
+  async sync(accessToken: string) {
+    if (!accessToken.trim()) throw new Error('Token ausente. Sincronização interrompida.')
     const results = { synced: 0, remaining: 0 }
     for (const item of this.list()) {
       try {

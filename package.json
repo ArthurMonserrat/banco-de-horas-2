@@ -23,7 +23,9 @@
   },
   "homepage": "https://github.com/ArthurMonserrat/banco-de-horas-2#readme",
   "dependencies": {
-    "@prisma/client": "^7.10.0"
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",

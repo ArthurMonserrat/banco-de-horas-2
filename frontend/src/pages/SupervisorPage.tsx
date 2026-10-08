@@ -11,6 +11,7 @@ import { ManagerCalendar } from '../features/calendar/ManagerCalendar'
 import { RejectionDialog } from '../features/supervisor/RejectionDialog'
 import { SupervisorEntriesTable } from '../features/supervisor/SupervisorEntriesTable'
 import { SupervisorRequestsTable } from '../features/supervisor/SupervisorRequestsTable'
+import { filterSupervisorHistoryEntries, type HistoryStatusFilter, type SupervisorHistoryFilters } from '../features/supervisor/historyFilters'
 import type { SupervisorPendingEntry, SupervisorTimeOffRequest } from '../features/supervisor/types'
 import { useSupervisorDashboard } from '../features/supervisor/useSupervisorDashboard'
 import { useSession } from '../features/session/useSession'
@@ -147,31 +148,91 @@ function SupervisorSidebar({ activeView, profile, onChange, onSignOut }: {
 }
 
 function HistoryView({ entries }: { entries: SupervisorPendingEntry[] }) {
-  const treatedEntries = entries.filter((entry) => entry.status !== 'PENDING')
-  if (treatedEntries.length === 0) {
-    return <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8 text-center text-sm font-semibold text-[var(--color-text-muted)]">Nenhum apontamento tratado até o momento.</div>
+  const [filters, setFilters] = useState<SupervisorHistoryFilters>({
+    technician: '',
+    project: 'Todos',
+    startDate: '',
+    endDate: '',
+    status: 'ALL',
+  })
+  const filteredEntries = useMemo(() => filterSupervisorHistoryEntries(entries, filters), [entries, filters])
+  const projectOptions = useMemo(() => ['Todos', ...Array.from(new Set(entries.map((entry) => entry.projectCode))).sort()], [entries])
+
+  function updateFilter<Key extends keyof SupervisorHistoryFilters>(field: Key, value: SupervisorHistoryFilters[Key]) {
+    setFilters((current) => ({ ...current, [field]: value }))
   }
+
+  function clearFilters() {
+    setFilters({ technician: '', project: 'Todos', startDate: '', endDate: '', status: 'ALL' })
+  }
+
   return (
-    <section className="ui-card rounded-2xl p-5" aria-labelledby="supervisor-history-title">
-      <div className="mb-4">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">Consolidado</p>
-        <h2 id="supervisor-history-title" className="mt-1 text-xl font-extrabold text-[var(--color-text)]">Histórico de validações</h2>
-      </div>
-      <div className="max-h-[600px] space-y-3 overflow-y-auto">
-        {treatedEntries.map((entry) => (
-          <article key={entry.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="font-extrabold text-[var(--color-text)]">{entry.collaboratorName}</p>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">{entry.entryDate} · {entry.projectCode} · {entry.activityName}</p>
-                {entry.rejectionReason && <p className="mt-2 text-sm text-[var(--color-text-muted)]">Motivo: {entry.rejectionReason}</p>}
-              </div>
-              <StatusBadge tone={entry.status === 'APPROVED' ? 'success' : 'danger'}>{entry.status === 'APPROVED' ? 'Aprovado' : 'Rejeitado'}</StatusBadge>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
+    <div className="space-y-5">
+      <section className="ui-card rounded-2xl p-5" aria-label="Filtros do histórico do supervisor">
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">Busca rápida</p>
+          <h2 className="mt-1 text-xl font-extrabold text-[var(--color-text)]">Filtrar histórico</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
+          <label className="text-sm font-bold ui-text">
+            Técnico
+            <input type="search" value={filters.technician} onChange={(event) => updateFilter('technician', event.target.value)} placeholder="Buscar por nome" className="mt-2 w-full ui-field rounded-xl px-3 py-2.5 font-normal ui-text outline-none focus:ring-2" />
+          </label>
+          <label className="text-sm font-bold ui-text">
+            Projeto / Obra
+            <select value={filters.project} onChange={(event) => updateFilter('project', event.target.value)} className="mt-2 w-full ui-field rounded-xl px-3 py-2.5 font-normal ui-text">
+              {projectOptions.map((project) => <option key={project} value={project}>{project === 'Todos' ? 'Todos os projetos' : project}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-bold ui-text">
+            Data Inicial
+            <input type="date" value={filters.startDate} onChange={(event) => updateFilter('startDate', event.target.value)} className="mt-2 w-full ui-field rounded-xl px-3 py-2.5 font-normal ui-text" />
+          </label>
+          <label className="text-sm font-bold ui-text">
+            Data Final
+            <input type="date" min={filters.startDate || undefined} value={filters.endDate} onChange={(event) => updateFilter('endDate', event.target.value)} className="mt-2 w-full ui-field rounded-xl px-3 py-2.5 font-normal ui-text" />
+          </label>
+          <label className="text-sm font-bold ui-text">
+            Status
+            <select value={filters.status} onChange={(event) => updateFilter('status', event.target.value as HistoryStatusFilter)} className="mt-2 w-full ui-field rounded-xl px-3 py-2.5 font-normal ui-text">
+              <option value="ALL">Todos</option>
+              <option value="PENDING">Pendentes</option>
+              <option value="APPROVED">Aprovados</option>
+              <option value="REJECTED">Rejeitados</option>
+            </select>
+          </label>
+          <button type="button" onClick={clearFilters} className="self-end rounded-xl border ui-border px-4 py-2.5 text-sm font-bold ui-text transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]">Limpar Filtros</button>
+        </div>
+      </section>
+
+      <section className="ui-card rounded-2xl p-5" aria-labelledby="supervisor-history-title">
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-secondary)]">Consolidado</p>
+          <h2 id="supervisor-history-title" className="mt-1 text-xl font-extrabold text-[var(--color-text)]">Histórico de validações</h2>
+          <p className="mt-1 text-sm ui-text-muted">{filteredEntries.length} registro(s) encontrado(s).</p>
+        </div>
+        {filteredEntries.length === 0 ? (
+          <div className="rounded-xl border border-dashed ui-border p-8 text-center text-sm font-semibold ui-text-muted">
+            Nenhum apontamento encontrado para os filtros selecionados.
+          </div>
+        ) : (
+          <div className="max-h-[600px] space-y-3 overflow-y-auto">
+            {filteredEntries.map((entry) => (
+              <article key={entry.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-extrabold text-[var(--color-text)]">{entry.collaboratorName}</p>
+                    <p className="mt-1 text-sm text-[var(--color-text-muted)]">{entry.entryDate} · {entry.projectCode} · {entry.activityName}</p>
+                    {entry.rejectionReason && <p className="mt-2 text-sm text-[var(--color-text-muted)]">Motivo: {entry.rejectionReason}</p>}
+                  </div>
+                  <StatusBadge tone={entry.status === 'APPROVED' ? 'success' : entry.status === 'REJECTED' ? 'danger' : 'pending'}>{entryStatusLabel[entry.status]}</StatusBadge>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
 

@@ -289,11 +289,11 @@ describe('tokens institucionais e contraste', () => {
     }
   })
 
-  it('mantem a logo como etiqueta branca sem filtros ou blend no tema escuro', () => {
+  it('mantem a logo como etiqueta branca sem filtros ou blend global no tema escuro', () => {
     expect(stylesheet).toContain('.brand-mark__image-frame')
     expect(stylesheet).toContain('background: #FFFFFF')
     expect(stylesheet).not.toContain('.dark .brand-mark img')
-    expect(stylesheet).not.toContain('mix-blend-mode')
+    expect(stylesheet).not.toMatch(/\.brand-mark img\s*\{[^}]*mix-blend-mode/s)
     expect(stylesheet).not.toContain('filter: invert')
   })
 

@@ -5,6 +5,8 @@ import { useSession } from '../features/session/useSession'
 import { profileService } from '../services/profileService'
 import { InstallAppButton } from './InstallAppButton'
 import { NavigationIcon } from './NavigationIcon'
+import { SwitchSystemButton } from './SwitchSystemButton'
+import { useCorporateIdentity } from '../features/profile/useCorporateIdentity'
 
 type SidebarContentProps = {
   onNavigate: () => void
@@ -23,18 +25,19 @@ function getInitials(name: string) {
 
 function SidebarContent({ onNavigate }: SidebarContentProps) {
   const { profile, session, signOut } = useSession()
+  const corporateIdentity = useCorporateIdentity()
   const navigate = useNavigate()
   const assignment = profile ? profileService.resolveAssignment(profile.id) : null
   const isDirector = session?.role === 'DIRECTOR_ADMIN'
   const sidebarProfile = isDirector
-    ? { name: 'Diretoria SM&A', jobTitle: 'Visão macro' }
+    ? corporateIdentity ? { name: corporateIdentity.fullName, jobTitle: 'Diretoria' } : { name: 'Diretoria SM&A', jobTitle: 'Visão macro' }
     : profile
       ? { name: profile.name, jobTitle: profile.jobTitle }
       : session
         ? { name: session.name, jobTitle: session.role === 'SUPERVISOR' ? 'Supervisão' : 'Colaborador' }
         : null
   const sidebarProfileLabel = isDirector ? 'Perfil atual da diretoria' : 'Perfil atual do usuário'
-  const sidebarInitials = isDirector ? 'DI' : sidebarProfile ? getInitials(sidebarProfile.name) : ''
+  const sidebarInitials = isDirector ? (corporateIdentity?.initials ?? 'DI') : sidebarProfile ? getInitials(sidebarProfile.name) : ''
   const sidebarSquad = assignment?.squadName ?? (isDirector ? 'Visão macro' : 'Não definida')
   const navigation = session?.role === 'DIRECTOR_ADMIN' ? directorNavigation : collaboratorNavigation
   const navigationLabel = session?.role === 'DIRECTOR_ADMIN' ? 'Navegação da diretoria' : 'Navegação do colaborador'
@@ -92,6 +95,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
       </nav>
 
       <div className="border-t border-[var(--color-sidebar-border)] p-4">
+        <SwitchSystemButton />
         <InstallAppButton />
         <button type="button" onClick={handleSignOut} className="w-full rounded-xl border border-[var(--color-sidebar-border)] px-4 py-3 text-left text-sm font-bold text-[var(--color-sidebar-text)] hover:bg-[var(--color-navigation-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-sidebar-text)]">
           Sair do sistema

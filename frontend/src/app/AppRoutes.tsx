@@ -15,6 +15,7 @@ import { AvisosPage } from '../pages/AvisosPage'
 import { RelatoriosPage } from '../pages/RelatoriosPage'
 import { DiretoriaHistoricoPage } from '../pages/DiretoriaHistoricoPage'
 import { AuthCallbackPage } from '../pages/AuthCallbackPage'
+import { DiretorPerfilPage } from '../pages/DiretorPerfilPage'
 
 export function AppRoutes() {
   return (
@@ -34,6 +35,9 @@ export function AppRoutes() {
       <Route path="/supervisor" element={<ProtectedRoute allowedRoles={['SUPERVISOR']}><SupervisorPage /></ProtectedRoute>} />
       <Route path="/administracao" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><DiretoriaPage /></ProtectedRoute>} />
       <Route path="/administracao/equipes" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><EquipesPage /></ProtectedRoute>} />
+      <Route path="/administracao/perfil" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><AppLayout /></ProtectedRoute>}>
+        <Route index element={<DiretorPerfilPage />} />
+      </Route>
       <Route path="/administracao/historico" element={<ProtectedRoute allowedRoles={['DIRECTOR_ADMIN']}><AppLayout /></ProtectedRoute>}>
         <Route index element={<DiretoriaHistoricoPage />} />
       </Route>

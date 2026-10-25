@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
 import { getEcosystemAuthConfig } from '../config/ecosystemAuth'
 import { ApiRequestError, saveApiSession, type ApiSession } from './api'
 
@@ -66,6 +66,18 @@ export async function completeMicrosoftLogin(code: string): Promise<Banco2LoginR
   } catch (error) {
     if (error instanceof ApiRequestError) return { ok: false, reason: `http_${error.status}`, message: error.message }
     return { ok: false, reason: 'network', message: 'Falha de comunicação ao concluir o login. Tente novamente.' }
+  }
+}
+
+/** Usuário do login Microsoft guardado no navegador (datas de acesso). Não faz nova chamada de login. */
+export async function getEcosystemAuthUser(): Promise<User | null> {
+  const supabase = getClient()
+  if (!supabase) return null
+  try {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.user ?? null
+  } catch {
+    return null
   }
 }
 

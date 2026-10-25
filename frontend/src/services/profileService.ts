@@ -22,8 +22,16 @@ export type UpdateSignatureInput = {
   signatureBase64: string
 }
 
+export type CorporateProfileSeed = {
+  id: string
+  name: string
+  email: string
+  jobTitle: string
+}
+
 export interface ProfileService {
   getById(collaboratorId: string): Promise<CollaboratorProfile | null>
+  ensureCorporateProfile(seed: CorporateProfileSeed): Promise<CollaboratorProfile>
   updateProfile(collaboratorId: string, input: UpdateProfileInput): Promise<CollaboratorProfile>
   saveSignature(collaboratorId: string, signatureBase64: string): Promise<CollaboratorProfile>
   changeActiveSquad(collaboratorId: string, squadId: string): Promise<CollaboratorProfile>
@@ -81,6 +89,21 @@ export class LocalProfileService implements ProfileService {
   async getById(collaboratorId: string) {
     const profile = this.read()
     return profile.id === collaboratorId ? profile : null
+  }
+
+  /**
+   * Login Microsoft: garante o perfil profissional local do usuário do Ecossistema.
+   * Nome e e-mail vêm da conta corporativa; assinatura e squad já salvas são mantidas.
+   * Usuário novo começa na squad padrão e pode trocá-la em Meu perfil.
+   */
+  async ensureCorporateProfile(seed: CorporateProfileSeed) {
+    const current = this.read()
+    const base: CollaboratorProfile = current.id === seed.id
+      ? current
+      : { id: seed.id, name: seed.name, email: seed.email, jobTitle: seed.jobTitle, active: true, activeSquadId: demoCollaborator.activeSquadId, location: { ...demoCollaborator.location } }
+    const updated: CollaboratorProfile = { ...base, name: seed.name, email: seed.email, active: true }
+    if (JSON.stringify(updated) !== JSON.stringify(current)) this.storage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updated))
+    return updated
   }
 
   async updateProfile(collaboratorId: string, input: UpdateProfileInput) {

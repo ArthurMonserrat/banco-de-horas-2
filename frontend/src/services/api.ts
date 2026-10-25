@@ -84,6 +84,10 @@ export function clearApiSession() {
   window.localStorage.removeItem(API_SESSION_STORAGE_KEY)
 }
 
+export function getStoredApiSession() {
+  return readApiSession()
+}
+
 export function getApiSessionToken() {
   return readApiSession()?.token ?? null
 }

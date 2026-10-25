@@ -14,12 +14,13 @@ import { EquipesPage } from '../pages/EquipesPage'
 import { AvisosPage } from '../pages/AvisosPage'
 import { RelatoriosPage } from '../pages/RelatoriosPage'
 import { DiretoriaHistoricoPage } from '../pages/DiretoriaHistoricoPage'
-import { EcosystemRedirectPage } from '../pages/EcosystemRedirectPage'
+import { AuthCallbackPage } from '../pages/AuthCallbackPage'
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<EcosystemRedirectPage />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
       <Route path="/colaborador" element={<ProtectedRoute allowedRoles={['COLLABORATOR']}><AppLayout /></ProtectedRoute>}>
         <Route index element={<ColaboradorPage />} />

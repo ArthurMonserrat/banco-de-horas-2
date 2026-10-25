@@ -6,6 +6,8 @@ import { ProfileSummary } from '../features/profile/ProfileSummary'
 import { WorkloadHistory } from '../features/workloads/WorkloadHistory'
 import { WorkloadRequestForm, type WorkloadFormField } from '../features/workloads/WorkloadRequestForm'
 import { getCorporateToday } from '../shared/utils/date'
+import { useCorporateIdentity } from '../features/profile/useCorporateIdentity'
+import { CorporateIdentityPanel } from '../features/profile/CorporateIdentityPanel'
 
 type WorkloadForm = { hours: string; minutes: string; effectiveFrom: string; justification: string }
 type ProfileForm = { name: string; email: string; jobTitle: string; activeSquadId: string }
@@ -26,6 +28,8 @@ function toDailyMinutes(form: WorkloadForm) {
 
 export function PerfilPage() {
   const profileState = useProfile()
+  // Login Microsoft: dados pessoais vêm da conta corporativa (preenchimento automático).
+  const corporateIdentity = useCorporateIdentity()
   const [form, setForm] = useState<WorkloadForm>(initialForm)
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfileForm)
   const [isEditing, setEditing] = useState(false)
@@ -136,7 +140,8 @@ export function PerfilPage() {
   return (
     <PageContainer title="Meu perfil" description="Informações profissionais, alocação e carga horária da sessão corporativa.">
       {profileState.isLoading && <p aria-live="polite" className="text-sm ui-text-muted">Carregando perfil profissional...</p>}
-      {profileState.error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-200"><p>{profileState.error}</p><button type="button" onClick={() => void profileState.reload()} className="mt-2 underline">Tentar novamente</button></div>}
+      {corporateIdentity && <CorporateIdentityPanel identity={corporateIdentity} />}
+      {profileState.error && !corporateIdentity && <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-200"><p>{profileState.error}</p><button type="button" onClick={() => void profileState.reload()} className="mt-2 underline">Tentar novamente</button></div>}
       {operationError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-200">{operationError}</p>}
       {feedback && <p aria-live="polite" className="rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">{feedback}</p>}
       {profileState.data && !profileState.isLoading && (

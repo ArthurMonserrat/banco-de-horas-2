@@ -101,6 +101,7 @@ describe('layout responsivo do colaborador', () => {
       ['Histórico', 'history'],
       ['Relatórios', 'bar-chart'],
       ['Avisos', 'bell'],
+      ['Meu perfil', 'user'],
     ])
   })
 

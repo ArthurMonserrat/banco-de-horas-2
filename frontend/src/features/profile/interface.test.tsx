@@ -9,6 +9,7 @@ import { PerfilPage } from '../../pages/PerfilPage'
 
 const { useProfileMock } = vi.hoisted(() => ({ useProfileMock: vi.fn() }))
 
+vi.mock('./useCorporateIdentity', () => ({ useCorporateIdentity: () => null }))
 vi.mock('../collaborator/useProfile', () => ({ useProfile: useProfileMock }))
 
 describe('interface de perfil profissional', () => {

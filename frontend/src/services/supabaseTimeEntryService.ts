@@ -17,6 +17,7 @@ function fromApi(entry: Awaited<ReturnType<typeof backendApi.listApontamentos>>[
     entryDate: entry.data,
     emObra: Boolean(entry.emObra),
     numeroObra: entry.numeroObra,
+    numeroContrato: entry.numeroContrato,
     clientId: entry.clientId ?? '',
     projectCode: entry.projeto,
     activityId: entry.atividade,
@@ -85,6 +86,7 @@ export class SupabaseTimeEntryService implements TimeEntryService {
       disciplineCode: data.disciplineCode,
       emObra: data.emObra,
       numeroObra: data.numeroObra,
+      numeroContrato: data.numeroContrato || undefined,
       funcaoContrato: data.funcaoContrato,
     })
     return fromApi(result.apontamento)
@@ -103,6 +105,7 @@ export class SupabaseTimeEntryService implements TimeEntryService {
       disciplineCode: data.disciplineCode,
       emObra: data.emObra,
       numeroObra: data.numeroObra,
+      numeroContrato: data.numeroContrato || undefined,
       funcaoContrato: data.funcaoContrato,
     }, expectedVersion, reason)
     return fromApi(result.apontamento)

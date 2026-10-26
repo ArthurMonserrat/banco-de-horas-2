@@ -37,6 +37,7 @@ function serialize(row: Banco2Row, user: AuthenticatedUser) {
     dataCriacao: String(row.created_at ?? ''),
     emObra: row.em_obra === true,
     numeroObra: typeof row.numero_obra === 'string' ? row.numero_obra : undefined,
+    numeroContrato: typeof row.numero_contrato === 'string' ? row.numero_contrato : undefined,
     clientId: typeof row.client_id === 'string' ? row.client_id : undefined,
     disciplineCode: typeof row.discipline_code === 'string' ? row.discipline_code : undefined,
     funcaoContrato: typeof row.funcao_contrato === 'string' ? row.funcao_contrato : undefined,
@@ -95,6 +96,8 @@ export function createApontamentosHandler(
           em_obra: body.emObra === true,
           numero_obra: parseString(body.numeroObra) || null,
           funcao_contrato: parseString(body.funcaoContrato) || null,
+          // Só envia a coluna quando preenchida: funciona mesmo antes da migration do numero_contrato.
+          ...(parseString(body.numeroContrato) ? { numero_contrato: parseString(body.numeroContrato) } : {}),
         })
         const row = rows[0]
         if (!row) return sendError(response, 502, 'O banco não confirmou o apontamento.')
@@ -110,6 +113,7 @@ export function createApontamentosHandler(
         for (const [input, column] of [['data', 'entry_date'], ['horaInicio', 'start_time'], ['horaFim', 'end_time'], ['projeto', 'project_code'], ['atividade', 'activity_id'], ['detalhamento', 'details'], ['clientId', 'client_id'], ['disciplineCode', 'discipline_code'], ['numeroObra', 'numero_obra'], ['funcaoContrato', 'funcao_contrato']] as const) {
           if (typeof body[input] !== 'undefined') payload[column] = parseString(body[input]) || null
         }
+        if (parseString(body.numeroContrato)) payload.numero_contrato = parseString(body.numeroContrato)
         if (typeof body.horasTotal !== 'undefined') payload.duration_minutes = Math.round(Number(body.horasTotal) * 60)
         if (!Object.keys(payload).length) return sendError(response, 400, 'Nenhuma alteração informada.')
         payload.last_edit_reason = parseString(body.editReason ?? body.motivo)

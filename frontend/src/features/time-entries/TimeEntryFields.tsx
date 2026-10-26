@@ -3,11 +3,13 @@ import { demoClients } from '../../mocks/demoData'
 import { formatDatePtBr } from '../../shared/utils/date'
 import { allTimeEntryActivities, requiresWorkSiteNumber } from './domain'
 import { parseRDO } from './rdoParser'
+import { findClientIdByRdoName } from './rdoClient'
 import type { ParsedRDODay } from './rdoParser'
 import type { TimeEntryValidationErrors } from './types'
 import type { TimeEntryFormValues } from './useTimeEntryForm'
 
 const VALE_CLIENT_ID = 'client-vale'
+
 
 export const fieldClassName = 'mt-2 w-full ui-field rounded-xl px-3 py-2.5 text-sm ui-text shadow-sm outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-[var(--color-surface-subtle)]'
 
@@ -34,10 +36,12 @@ type TimeEntryFieldsProps = {
   entryMode?: 'manual' | 'rdo'
   extractedRdoDays: ParsedRDODay[]
   onRdoDaysChange: (days: ParsedRDODay[]) => void
+  /** Nome do usuário logado, usado para achar as horas dele no RDO por profissional. */
+  collaboratorName?: string
   onChange: <Key extends keyof TimeEntryFormValues>(field: Key, value: TimeEntryFormValues[Key]) => void
 }
 
-export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true, entryMode = 'manual', extractedRdoDays, onRdoDaysChange, onChange }: TimeEntryFieldsProps) {
+export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true, entryMode = 'manual', extractedRdoDays, onRdoDaysChange, collaboratorName, onChange }: TimeEntryFieldsProps) {
   const [rdoStatus, setRdoStatus] = useState<'idle' | 'reading' | 'success' | 'error'>('idle')
   const [rdoMessage, setRdoMessage] = useState<string | null>(null)
   const [mostrarTodosDias, setMostrarTodosDias] = useState(false)
@@ -56,18 +60,20 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
     setRdoStatus('reading')
     setRdoMessage('Lendo PDF localmente...')
     try {
-      const parsed = await parseRDO(file)
+      const parsed = await parseRDO(file, { collaboratorName })
       let appliedFields = 0
       setMostrarTodosDias(false)
       onChange('emObra', true)
       onChange('activityId', '')
-      onChange('clientId', VALE_CLIENT_ID)
-      appliedFields += 1
+      const rdoClientId = findClientIdByRdoName(parsed.cliente)
+      onChange('clientId', parsed.modelo === 'medicao' ? rdoClientId ?? '' : VALE_CLIENT_ID)
+      if (parsed.modelo !== 'medicao' || rdoClientId) appliedFields += 1
       if (parsed.numeroObra) {
         onChange('numeroObra', parsed.numeroObra)
         onChange('projectCode', parsed.numeroObra)
         appliedFields += 1
       }
+      onChange('numeroContrato', parsed.numeroContrato ?? '')
       if (parsed.dias.length > 0) {
         const orderedDays = [...parsed.dias].sort((left, right) => left.data.localeCompare(right.data))
         onRdoDaysChange(orderedDays)
@@ -81,6 +87,16 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
         appliedFields += 1
       } else {
         onRdoDaysChange([])
+      }
+      if (parsed.aviso) {
+        setRdoStatus('error')
+        setRdoMessage(parsed.aviso)
+        return
+      }
+      if (parsed.modelo === 'medicao' && parsed.dias.length === 0) {
+        setRdoStatus('error')
+        setRdoMessage('Nenhum dia com horas suas foi encontrado nesse RDO.')
+        return
       }
       setRdoStatus(appliedFields > 0 ? 'success' : 'error')
       setRdoMessage(appliedFields > 0
@@ -171,6 +187,14 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
         <FieldError id="project-code-error" message={errors.projectCode} />
         <FieldError id="work-site-number-error" message={errors.numeroObra} />
       </div>
+
+      {(activityRequiresWorkSiteNumber || values.emObra || values.numeroContrato) && (
+        <div>
+          <label htmlFor="numero-contrato" className="text-sm font-bold ui-text">Nº do contrato / pedido de compra</label>
+          <input id="numero-contrato" name="numeroContrato" type="text" value={values.numeroContrato} onChange={(event) => onChange('numeroContrato', event.target.value)} className={fieldClassName} placeholder="Opcional" />
+          <p className="mt-1.5 text-xs ui-text-subtle">Preenchido automaticamente quando o RDO informa o contrato ou pedido de compra.</p>
+        </div>
+      )}
 
       <div>
         <label htmlFor="activity" className="text-sm font-bold ui-text">Atividade realizada</label>

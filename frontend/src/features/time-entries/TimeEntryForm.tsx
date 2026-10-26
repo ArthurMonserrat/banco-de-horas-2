@@ -5,6 +5,7 @@ import { FieldError, fieldClassName, TimeEntryFields } from './TimeEntryFields'
 import { formatMinutes, hoursAndMinutesToMinutes, NORMAL_WORKDAY_MINUTES } from './domain'
 import { useTimeEntryForm } from './useTimeEntryForm'
 import { CreateRdoButton } from '../rdo/CreateRdoButton'
+import { useSession } from '../session/useSession'
 
 function hourMinuteFields({
   idPrefix,
@@ -45,6 +46,7 @@ export function TimeEntryForm({ entryId }: { entryId?: string }) {
   const location = useLocation()
   const formRef = useRef<HTMLFormElement>(null)
   const [entryMode, setEntryMode] = useState<'manual' | 'rdo'>('manual')
+  const { session, profile } = useSession()
   const navigationState = location.state as { initialDate?: string; selectedDate?: string } | null
   const routedInitialDate = searchParams.get('date') ?? navigationState?.initialDate ?? navigationState?.selectedDate
   const controller = useTimeEntryForm({
@@ -116,6 +118,7 @@ export function TimeEntryForm({ entryId }: { entryId?: string }) {
         entryMode={entryMode}
         extractedRdoDays={controller.extractedRdoDays}
         onRdoDaysChange={controller.setExtractedRdoDays}
+        collaboratorName={profile?.name ?? session?.name}
         onChange={controller.setField}
       />
 

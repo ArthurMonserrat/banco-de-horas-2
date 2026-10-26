@@ -37,6 +37,7 @@ export type TimeEntryFormValues = {
   partialDayOffMinutes: string
   details: string
   funcaoContrato: string
+  numeroContrato: string
   editReason: string
 }
 
@@ -66,6 +67,7 @@ const emptyValues = (entryDate: string): TimeEntryFormValues => ({
   partialDayOffMinutes: '',
   details: '',
   funcaoContrato: '',
+  numeroContrato: '',
   editReason: '',
 })
 
@@ -96,6 +98,7 @@ function valuesFromEntry(entry: TimeEntry): TimeEntryFormValues {
     partialDayOffMinutes: entry.partialDayOffMinutes > 0 ? String(entry.partialDayOffMinutes % 60) : '',
     details: entry.details,
     funcaoContrato: entry.funcaoContrato ?? '',
+    numeroContrato: entry.numeroContrato ?? '',
     editReason: '',
   }
 }
@@ -201,6 +204,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       partialDayOffMinutes: hasExtractedRdoDays ? 0 : classifiedHours.partialDayOffMinutes,
       details: hasExtractedRdoDays ? firstExtractedDay.detalhamento : values.details,
       funcaoContrato: values.funcaoContrato,
+      numeroContrato: values.numeroContrato.trim() || undefined,
     }
     let dateBlock = { blocked: false } as Awaited<ReturnType<typeof entryDateAvailabilityService.getBlock>>
     if (isIsoDate(data.entryDate)) {

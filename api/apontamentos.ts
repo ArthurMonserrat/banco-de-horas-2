@@ -1,133 +1,131 @@
-import type { Prisma, StatusApontamento } from '@prisma/client'
-import { requireApiUser } from './_lib/auth'
+import { requireSupabaseUser, type AuthenticatedUser } from './_lib/auth'
 import type { ApiRequest, ApiResponse } from './_lib/http'
 import { methodNotAllowed, parseString, sendError } from './_lib/http'
-import { prisma } from './_lib/prisma'
+import { createSupabaseRestClient, readSupabaseDataConfig, type SupabaseRestClient } from './_lib/supabaseDatabase'
 
-function statusFromInput(value: unknown): StatusApontamento | null {
-  if (value === 'PENDENTE' || value === 'PENDING') return 'PENDENTE'
-  if (value === 'APROVADO' || value === 'APPROVED') return 'APROVADO'
-  if (value === 'REJEITADO' || value === 'REJECTED') return 'REJEITADO'
-  return null
+type Banco2Row = Record<string, unknown>
+
+function statusFromDatabase(value: unknown) {
+  if (value === 'approved') return 'APROVADO' as const
+  if (value === 'rejected') return 'REJEITADO' as const
+  if (value === 'cancelled') return 'CANCELADO' as const
+  return 'PENDENTE' as const
 }
 
-function scopeForUser(user: NonNullable<Awaited<ReturnType<typeof requireApiUser>>>): Prisma.ApontamentoWhereInput {
-  if (user.perfil === 'DIRETOR') return {}
-  if (user.perfil === 'SUPERVISOR') return { user: { supervisorId: user.id } }
-  return { userId: user.id }
+function toNumber(value: unknown) {
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(number) ? number : 0
 }
 
-function serializeApontamento(apontamento: Prisma.ApontamentoGetPayload<{ include: { user: { select: { id: true, nome: true, supervisorId: true } }, rdos: true } }>) {
+function serialize(row: Banco2Row, user: AuthenticatedUser) {
+  const durationMinutes = toNumber(row.duration_minutes)
   return {
-    id: apontamento.id,
-    userId: apontamento.userId,
-    userName: apontamento.user.nome,
-    supervisorId: apontamento.user.supervisorId,
-    data: apontamento.data.toISOString().slice(0, 10),
-    horaInicio: apontamento.horaInicio,
-    horaFim: apontamento.horaFim,
-    horasTotal: Number(apontamento.horasTotal),
-    projeto: apontamento.projeto,
-    atividade: apontamento.atividade,
-    detalhamento: apontamento.detalhamento,
-    status: apontamento.status,
-    justificativa: apontamento.justificativa,
-    versao: apontamento.versao,
-    dataCriacao: apontamento.dataCriacao.toISOString(),
-    rdos: apontamento.rdos.map((rdo) => ({ id: rdo.id, arquivoUrl: rdo.arquivoUrl, geradoEm: rdo.geradoEm.toISOString() })),
+    id: String(row.id ?? ''),
+    userId: String(row.profile_id ?? user.id),
+    userName: user.nome,
+    supervisorId: user.supervisorId,
+    data: String(row.entry_date ?? ''),
+    horaInicio: String(row.start_time ?? ''),
+    horaFim: String(row.end_time ?? ''),
+    horasTotal: durationMinutes / 60,
+    projeto: String(row.project_code ?? ''),
+    atividade: String(row.activity_id ?? ''),
+    detalhamento: String(row.details ?? ''),
+    status: statusFromDatabase(row.status),
+    justificativa: typeof row.rejection_reason === 'string' ? row.rejection_reason : null,
+    versao: toNumber(row.version) || 1,
+    dataCriacao: String(row.created_at ?? ''),
+    emObra: row.em_obra === true,
+    numeroObra: typeof row.numero_obra === 'string' ? row.numero_obra : undefined,
+    clientId: typeof row.client_id === 'string' ? row.client_id : undefined,
+    disciplineCode: typeof row.discipline_code === 'string' ? row.discipline_code : undefined,
+    funcaoContrato: typeof row.funcao_contrato === 'string' ? row.funcao_contrato : undefined,
   }
 }
 
-async function listApontamentos(request: ApiRequest, response: ApiResponse, user: NonNullable<Awaited<ReturnType<typeof requireApiUser>>>) {
-  const queryUserId = Array.isArray(request.query?.userId) ? request.query?.userId[0] : request.query?.userId
-  const where: Prisma.ApontamentoWhereInput = {
-    AND: [scopeForUser(user), queryUserId ? { userId: queryUserId } : {}],
+function bodyOf(request: ApiRequest) {
+  return request.body && typeof request.body === 'object' ? request.body as Record<string, unknown> : {}
+}
+
+function clientForToken(token: string): SupabaseRestClient | null {
+  const config = readSupabaseDataConfig()
+  return config ? createSupabaseRestClient(config.url, config.anonKey, token) : null
+}
+
+export function createApontamentosHandler(
+  authenticate = requireSupabaseUser,
+  getClient: (token: string) => SupabaseRestClient | null = clientForToken,
+) {
+  return async function handler(request: ApiRequest, response: ApiResponse) {
+    const user = await authenticate(request)
+    if (!user) return sendError(response, 401, 'Sessão inválida ou expirada.')
+    const authorization = request.headers.authorization
+    const token = Array.isArray(authorization) ? authorization[0]?.slice('Bearer '.length) : authorization?.slice('Bearer '.length)
+    if (!token) return sendError(response, 401, 'Sessão inválida ou expirada.')
+    const client = getClient(token)
+    if (!client) return sendError(response, 503, 'Persistência do Banco 2 não configurada.')
+
+    try {
+      if (request.method === 'GET') {
+        const rows = await client.select('apontamentos', 'select=*&order=entry_date.desc,created_at.desc')
+        return response.status(200).json({ apontamentos: rows.map((row) => serialize(row as Banco2Row, user)) })
+      }
+
+      if (request.method === 'POST') {
+        const body = bodyOf(request)
+        const data = parseString(body.data)
+        const projeto = parseString(body.projeto)
+        const atividade = parseString(body.atividade)
+        const detalhamento = parseString(body.detalhamento)
+        const horasTotal = Number(body.horasTotal)
+        if (!data || !projeto || !atividade || !detalhamento || !Number.isFinite(horasTotal) || horasTotal <= 0) {
+          return sendError(response, 400, 'Dados obrigatórios do apontamento incompletos.')
+        }
+        const rows = await client.insert('apontamentos', {
+          profile_id: user.id,
+          entry_date: data,
+          start_time: parseString(body.horaInicio) || null,
+          end_time: parseString(body.horaFim) || null,
+          duration_minutes: Math.round(horasTotal * 60),
+          client_id: parseString(body.clientId) || null,
+          project_code: projeto,
+          activity_id: atividade,
+          discipline_code: parseString(body.disciplineCode) || null,
+          details: detalhamento,
+          em_obra: body.emObra === true,
+          numero_obra: parseString(body.numeroObra) || null,
+          funcao_contrato: parseString(body.funcaoContrato) || null,
+        })
+        const row = rows[0]
+        if (!row) return sendError(response, 502, 'O banco não confirmou o apontamento.')
+        return response.status(201).json({ apontamento: serialize(row as Banco2Row, user) })
+      }
+
+      if (request.method === 'PATCH' || request.method === 'PUT') {
+        const body = bodyOf(request)
+        const id = parseString(body.id ?? request.query?.id)
+        const expectedVersion = Number(body.versao ?? body.expectedVersion)
+        if (!id || !Number.isInteger(expectedVersion) || expectedVersion < 1) return sendError(response, 400, 'Informe o apontamento e a versão esperada.')
+        const payload: Record<string, unknown> = {}
+        for (const [input, column] of [['data', 'entry_date'], ['horaInicio', 'start_time'], ['horaFim', 'end_time'], ['projeto', 'project_code'], ['atividade', 'activity_id'], ['detalhamento', 'details'], ['clientId', 'client_id'], ['disciplineCode', 'discipline_code'], ['numeroObra', 'numero_obra'], ['funcaoContrato', 'funcao_contrato']] as const) {
+          if (typeof body[input] !== 'undefined') payload[column] = parseString(body[input]) || null
+        }
+        if (typeof body.horasTotal !== 'undefined') payload.duration_minutes = Math.round(Number(body.horasTotal) * 60)
+        if (!Object.keys(payload).length) return sendError(response, 400, 'Nenhuma alteração informada.')
+        payload.last_edit_reason = parseString(body.editReason ?? body.motivo)
+        const rows = await client.update('apontamentos', `id=eq.${encodeURIComponent(id)}&profile_id=eq.${encodeURIComponent(user.id)}&version=eq.${expectedVersion}&status=in.(pending,rejected)`, payload)
+        const row = rows[0]
+        if (!row) return sendError(response, 409, 'O apontamento foi alterado, aprovado ou não pertence ao usuário atual.')
+        return response.status(200).json({ apontamento: serialize(row as Banco2Row, user) })
+      }
+
+      if (request.method === 'DELETE') return sendError(response, 405, 'Cancelamento deve usar a operação transacional do Banco 2.')
+      return methodNotAllowed(response)
+    } catch (error) {
+      console.error('[apontamentos] Falha na persistência Supabase:', error instanceof Error ? error.message : error)
+      return sendError(response, 502, 'Não foi possível persistir o apontamento no Supabase.')
+    }
   }
-  const apontamentos = await prisma.apontamento.findMany({
-    where,
-    include: { user: { select: { id: true, nome: true, supervisorId: true } }, rdos: true },
-    orderBy: [{ data: 'desc' }, { dataCriacao: 'desc' }],
-  })
-  response.status(200).json({ apontamentos: apontamentos.map(serializeApontamento) })
 }
 
-async function createApontamento(request: ApiRequest, response: ApiResponse, user: NonNullable<Awaited<ReturnType<typeof requireApiUser>>>) {
-  const body = request.body && typeof request.body === 'object' ? request.body as Record<string, unknown> : {}
-  const targetUserId = user.perfil === 'COLABORADOR' ? user.id : parseString(body.userId) || user.id
-  const data = parseString(body.data)
-  const horaInicio = parseString(body.horaInicio)
-  const horaFim = parseString(body.horaFim)
-  const horasTotal = Number(body.horasTotal)
-  const projeto = parseString(body.projeto)
-  const atividade = parseString(body.atividade)
-  const detalhamento = parseString(body.detalhamento)
-
-  if (!data || !horaInicio || !horaFim || !Number.isFinite(horasTotal) || !projeto || !atividade || !detalhamento) {
-    return sendError(response, 400, 'Dados obrigatórios do apontamento incompletos.')
-  }
-
-  const apontamento = await prisma.apontamento.create({
-    data: {
-      userId: targetUserId,
-      data: new Date(`${data}T00:00:00.000Z`),
-      horaInicio,
-      horaFim,
-      horasTotal,
-      projeto,
-      atividade,
-      detalhamento,
-      status: statusFromInput(body.status) ?? 'PENDENTE',
-      justificativa: parseString(body.justificativa) || null,
-    },
-    include: { user: { select: { id: true, nome: true, supervisorId: true } }, rdos: true },
-  })
-
-  response.status(201).json({ apontamento: serializeApontamento(apontamento) })
-}
-
-async function updateApontamento(request: ApiRequest, response: ApiResponse, user: NonNullable<Awaited<ReturnType<typeof requireApiUser>>>) {
-  const body = request.body && typeof request.body === 'object' ? request.body as Record<string, unknown> : {}
-  const id = parseString(body.id ?? request.query?.id)
-  if (!id) return sendError(response, 400, 'Informe o apontamento.')
-
-  const existing = await prisma.apontamento.findFirst({ where: { AND: [{ id }, scopeForUser(user)] } })
-  if (!existing) return sendError(response, 404, 'Apontamento não encontrado.')
-
-  const status = statusFromInput(body.status)
-  const data: Prisma.ApontamentoUpdateInput = {
-    versao: { increment: 1 },
-  }
-  if (status) data.status = status
-  if (typeof body.justificativa !== 'undefined') data.justificativa = parseString(body.justificativa) || null
-  if (typeof body.projeto !== 'undefined') data.projeto = parseString(body.projeto)
-  if (typeof body.atividade !== 'undefined') data.atividade = parseString(body.atividade)
-  if (typeof body.detalhamento !== 'undefined') data.detalhamento = parseString(body.detalhamento)
-
-  const apontamento = await prisma.apontamento.update({
-    where: { id },
-    data,
-    include: { user: { select: { id: true, nome: true, supervisorId: true } }, rdos: true },
-  })
-
-  response.status(200).json({ apontamento: serializeApontamento(apontamento) })
-}
-
-async function deleteApontamento(request: ApiRequest, response: ApiResponse, user: NonNullable<Awaited<ReturnType<typeof requireApiUser>>>) {
-  const id = parseString(request.query?.id)
-  if (!id) return sendError(response, 400, 'Informe o apontamento.')
-  const existing = await prisma.apontamento.findFirst({ where: { AND: [{ id }, scopeForUser(user)] } })
-  if (!existing) return sendError(response, 404, 'Apontamento não encontrado.')
-  await prisma.apontamento.delete({ where: { id } })
-  response.status(200).json({ ok: true })
-}
-
-export default async function handler(request: ApiRequest, response: ApiResponse) {
-  const user = await requireApiUser(request)
-  if (!user) return sendError(response, 401, 'Sessão inválida ou expirada.')
-
-  if (request.method === 'GET') return listApontamentos(request, response, user)
-  if (request.method === 'POST') return createApontamento(request, response, user)
-  if (request.method === 'PATCH' || request.method === 'PUT') return updateApontamento(request, response, user)
-  if (request.method === 'DELETE') return deleteApontamento(request, response, user)
-  return methodNotAllowed(response)
-}
+export default createApontamentosHandler()

@@ -29,6 +29,11 @@ export type ApiApontamento = {
   justificativa?: string | null
   versao: number
   dataCriacao: string
+  emObra?: boolean
+  numeroObra?: string
+  clientId?: string
+  disciplineCode?: string
+  funcaoContrato?: string
 }
 
 export type CreateApiApontamentoInput = {
@@ -42,6 +47,11 @@ export type CreateApiApontamentoInput = {
   detalhamento: string
   status?: ApiStatusApontamento
   justificativa?: string
+  emObra?: boolean
+  numeroObra?: string
+  clientId?: string
+  disciplineCode?: string
+  funcaoContrato?: string
 }
 
 export type ApiSession = {
@@ -139,10 +149,17 @@ export const backendApi = {
     }, accessToken)
   },
 
-  async updateApontamentoStatus(id: string, status: ApiStatusApontamento, justificativa?: string) {
+  async updateApontamentoStatus(id: string, status: ApiStatusApontamento, justificativa?: string, versao?: number) {
     return apiFetch<{ apontamento: ApiApontamento }>('/api/apontamentos', {
       method: 'PATCH',
-      body: JSON.stringify({ id, status, justificativa }),
+      body: JSON.stringify({ id, status, justificativa, versao }),
+    })
+  },
+
+  async updateApontamento(id: string, input: Partial<CreateApiApontamentoInput>, versao: number, motivo: string) {
+    return apiFetch<{ apontamento: ApiApontamento }>('/api/apontamentos', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, ...input, versao, motivo }),
     })
   },
 }

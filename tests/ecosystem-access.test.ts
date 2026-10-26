@@ -18,12 +18,12 @@ function fakeFetch(routes: { user: Route; profile?: Route; access?: Route }) {
 }
 
 const azureUser: Route = { body: { id: 'auth-1', app_metadata: { provider: 'azure' } } }
-const activeProfile: Route = { body: [{ email: 'Fernando.Almeida@sma-eng.com.br', full_name: 'Fernando Almeida', role: 'colaborador', active: true }] }
+const activeProfile: Route = { body: [{ id: 'auth-1', email: 'Fernando.Almeida@sma-eng.com.br', full_name: 'Fernando Almeida', role: 'colaborador', active: true }] }
 
 test('libera quem tem perfil ativo e acesso BANCO_2, usando o cargo do banco', async () => {
   const { impl, calls } = fakeFetch({ user: azureUser, profile: activeProfile, access: { body: [{ role: 'diretor' }] } })
   const result = await verifyBanco2Access('token-supabase', config, impl)
-  assert.deepEqual(result, { ok: true, identity: { email: 'fernando.almeida@sma-eng.com.br', nome: 'Fernando Almeida', role: 'diretor' } })
+  assert.deepEqual(result, { ok: true, identity: { profileId: 'auth-1', email: 'fernando.almeida@sma-eng.com.br', nome: 'Fernando Almeida', role: 'diretor' } })
   assert.equal(calls[0].headers?.Authorization, 'Bearer token-supabase')
   assert.equal(calls[0].headers?.apikey, 'anon')
   assert.match(calls[2].url, /profile_module_access\?profile_id=eq\.auth-1&module=eq\.BANCO_2&active=eq\.true/)

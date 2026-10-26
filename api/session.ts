@@ -1,7 +1,7 @@
 import type { ApiRequest, ApiResponse } from './_lib/http'
 import { getBearerToken, methodNotAllowed, sendError } from './_lib/http'
 import { verifyBanco2Access, type EcosystemAccessResult, type EcosystemIdentity, type EcosystemRole } from './_lib/ecosystemAccess'
-import { createSessionToken, type SessionPerfil } from './_lib/sessionToken'
+import type { SessionPerfil } from './_lib/sessionToken'
 
 /**
  * POST /api/session
@@ -19,7 +19,8 @@ export type Banco2User = {
 
 export type SessionHandlerDeps = {
   verifyAccess: (accessToken: string) => Promise<EcosystemAccessResult>
-  upsertUser: (identity: EcosystemIdentity & { perfil: SessionPerfil }) => Promise<Banco2User>
+  /** Compatibilidade de testes/legado; o caminho corporativo padrão não cria User duplicado. */
+  createUser?: (identity: EcosystemIdentity & { perfil: SessionPerfil }) => Promise<Banco2User>
   createToken: (user: Banco2User) => string
 }
 
@@ -29,23 +30,12 @@ const PERFIL_BY_ROLE: Record<EcosystemRole, SessionPerfil> = {
   diretor: 'DIRETOR',
 }
 
-/** Senha impossível de usar: o login por senha foi desativado; a coluna é obrigatória no schema. */
-export const SSO_PASSWORD_MARKER = '!sso-microsoft-ecossistema'
-
-async function upsertUserWithPrisma(identity: EcosystemIdentity & { perfil: SessionPerfil }): Promise<Banco2User> {
-  const { prisma } = await import('./_lib/prisma.js')
-  return prisma.user.upsert({
-    where: { email: identity.email },
-    update: { nome: identity.nome, perfil: identity.perfil },
-    create: { nome: identity.nome, email: identity.email, senha: SSO_PASSWORD_MARKER, perfil: identity.perfil },
-    select: { id: true, nome: true, email: true, perfil: true, supervisorId: true },
-  })
-}
-
 const defaultDeps: SessionHandlerDeps = {
   verifyAccess: (accessToken) => verifyBanco2Access(accessToken),
-  upsertUser: upsertUserWithPrisma,
-  createToken: (user) => createSessionToken(user),
+  // O token Supabase continua sendo a autoridade da sessão. O endpoint apenas
+  // materializa a identidade verificada para o frontend; não cria uma segunda
+  // conta local por e-mail.
+  createToken: (_user) => '',
 }
 
 export function createSessionHandler(deps: SessionHandlerDeps = defaultDeps) {
@@ -63,9 +53,17 @@ export function createSessionHandler(deps: SessionHandlerDeps = defaultDeps) {
 
     try {
       const perfil = PERFIL_BY_ROLE[access.identity.role]
-      const user = await deps.upsertUser({ ...access.identity, perfil })
+      const user = deps.createUser
+        ? await deps.createUser({ ...access.identity, perfil })
+        : {
+            id: access.identity.profileId,
+            nome: access.identity.nome,
+            email: access.identity.email,
+            perfil,
+            supervisorId: null,
+          }
       return response.status(200).json({
-        token: deps.createToken(user),
+        token: deps.createToken(user) || accessToken,
         user: { id: user.id, nome: user.nome, email: user.email, perfil: user.perfil, supervisorId: user.supervisorId },
       })
     } catch (error) {

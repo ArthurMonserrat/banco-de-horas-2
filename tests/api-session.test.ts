@@ -16,8 +16,8 @@ function deps(overrides: Partial<SessionHandlerDeps> = {}): SessionHandlerDeps &
   const upserts: unknown[] = []
   return {
     upserts,
-    verifyAccess: async () => ({ ok: true, identity: { email: 'fernando.almeida@sma-eng.com.br', nome: 'Fernando Almeida', role: 'diretor' } }),
-    upsertUser: async (identity) => {
+    verifyAccess: async () => ({ ok: true, identity: { profileId: 'profile-1', email: 'fernando.almeida@sma-eng.com.br', nome: 'Fernando Almeida', role: 'diretor' } }),
+    createUser: async (identity) => {
       upserts.push(identity)
       return { id: 'prisma-1', nome: identity.nome, email: identity.email, perfil: identity.perfil, supervisorId: null } satisfies Banco2User
     },
@@ -35,7 +35,18 @@ test('login Microsoft com acesso ao Banco 2 abre sessão com o perfil certo', as
     token: 'token-prisma-1-DIRETOR',
     user: { id: 'prisma-1', nome: 'Fernando Almeida', email: 'fernando.almeida@sma-eng.com.br', perfil: 'DIRETOR', supervisorId: null },
   })
-  assert.deepEqual(d.upserts, [{ email: 'fernando.almeida@sma-eng.com.br', nome: 'Fernando Almeida', role: 'diretor', perfil: 'DIRETOR' }])
+  assert.deepEqual(d.upserts, [{ profileId: 'profile-1', email: 'fernando.almeida@sma-eng.com.br', nome: 'Fernando Almeida', role: 'diretor', perfil: 'DIRETOR' }])
+})
+
+test('sessão corporativa usa o profile_id do Supabase e não cria usuário duplicado por e-mail', async () => {
+  const d = deps({ createUser: undefined })
+  const { res, state } = response()
+  await createSessionHandler(d)({ method: 'POST', headers: { authorization: 'Bearer supabase-token' } }, res)
+  assert.equal(state.status, 200)
+  assert.deepEqual(state.body, {
+    token: 'token-profile-1-DIRETOR',
+    user: { id: 'profile-1', nome: 'Fernando Almeida', email: 'fernando.almeida@sma-eng.com.br', perfil: 'DIRETOR', supervisorId: null },
+  })
 })
 
 test('sem acesso ao Banco 2: 403 e nenhum usuário criado', async () => {
@@ -57,6 +68,6 @@ test('sem token: 401; método errado: 405; banco fora do ar: 500', async () => {
   assert.equal(wrongMethod.state.status, 405)
 
   const dbDown = response()
-  await createSessionHandler(deps({ upsertUser: async () => { throw new Error('db down') } }))({ method: 'POST', headers: { authorization: 'Bearer t' } }, dbDown.res)
+  await createSessionHandler(deps({ createUser: async () => { throw new Error('db down') } }))({ method: 'POST', headers: { authorization: 'Bearer t' } }, dbDown.res)
   assert.equal(dbDown.state.status, 500)
 })

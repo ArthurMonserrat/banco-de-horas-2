@@ -1,4 +1,4 @@
-import { publicUser, requireApiUser } from './_lib/auth'
+import { publicUser, requireSupabaseUser } from './_lib/auth'
 import type { ApiRequest, ApiResponse } from './_lib/http'
 import { methodNotAllowed, sendError } from './_lib/http'
 
@@ -9,7 +9,7 @@ import { methodNotAllowed, sendError } from './_lib/http'
  */
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method === 'GET') {
-    const user = await requireApiUser(request)
+    const user = await requireSupabaseUser(request)
     if (!user) return sendError(response, 401, 'Sessão inválida ou expirada.')
     return response.status(200).json({ user: publicUser(user) })
   }

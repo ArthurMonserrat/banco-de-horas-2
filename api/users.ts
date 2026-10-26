@@ -1,35 +1,37 @@
-import type { Prisma } from '@prisma/client'
-import { publicUser, requireApiUser } from './_lib/auth'
+import { requireSupabaseUser } from './_lib/auth'
 import type { ApiRequest, ApiResponse } from './_lib/http'
 import { methodNotAllowed, sendError } from './_lib/http'
-import { prisma } from './_lib/prisma'
-
-function scopeForUser(user: Awaited<ReturnType<typeof requireApiUser>>): Prisma.UserWhereInput {
-  if (!user) return { id: '__unauthorized__' }
-  if (user.perfil === 'DIRETOR') return {}
-  if (user.perfil === 'SUPERVISOR') return { supervisorId: user.id }
-  return { id: user.id }
-}
+import { createSupabaseRestClient, readSupabaseDataConfig } from './_lib/supabaseDatabase'
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== 'GET') return methodNotAllowed(response)
-
-  const user = await requireApiUser(request)
+  const user = await requireSupabaseUser(request)
   if (!user) return sendError(response, 401, 'Sessão inválida ou expirada.')
+  const authorization = request.headers.authorization
+  const token = Array.isArray(authorization) ? authorization[0]?.slice('Bearer '.length) : authorization?.slice('Bearer '.length)
+  const config = readSupabaseDataConfig()
+  if (!token || !config) return sendError(response, 503, 'Persistência do Banco 2 não configurada.')
 
-  const users = await prisma.user.findMany({
-    where: scopeForUser(user),
-    select: {
-      id: true,
-      nome: true,
-      email: true,
-      perfil: true,
-      supervisorId: true,
-      assinaturaBase64: true,
-      dataCriacao: true,
-    },
-    orderBy: [{ perfil: 'desc' }, { nome: 'asc' }],
-  })
-
-  response.status(200).json({ users: users.map((item) => ({ ...publicUser(item), assinaturaBase64: item.assinaturaBase64, dataCriacao: item.dataCriacao.toISOString() })) })
+  try {
+    const client = createSupabaseRestClient(config.url, config.anonKey, token, fetch, 'public')
+    const rows = await client.select('profiles', 'select=id,email,full_name,role,active,squad_id&order=full_name.asc')
+    const users = rows
+      .filter((row) => row && typeof row === 'object')
+      .map((row) => {
+        const item = row as Record<string, unknown>
+        return {
+          id: String(item.id ?? ''),
+          nome: typeof item.full_name === 'string' ? item.full_name : '',
+          email: typeof item.email === 'string' ? item.email : '',
+          perfil: item.role === 'diretor' ? 'DIRETOR' : item.role === 'supervisor' ? 'SUPERVISOR' : 'COLABORADOR',
+          supervisorId: null,
+          assinaturaBase64: null,
+          dataCriacao: typeof item.created_at === 'string' ? item.created_at : undefined,
+        }
+      })
+    return response.status(200).json({ users })
+  } catch (error) {
+    console.error('[users] Falha ao consultar perfis no Supabase:', error instanceof Error ? error.message : error)
+    return sendError(response, 502, 'Não foi possível consultar os perfis corporativos.')
+  }
 }

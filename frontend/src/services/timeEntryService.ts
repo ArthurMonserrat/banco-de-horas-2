@@ -12,6 +12,7 @@ import { auditService } from './auditService'
 import { profileService } from './profileService'
 import type { EntryDateBlock } from '../features/calendar/entryDatePolicy'
 import { entryDateAvailabilityService } from './entryDateAvailabilityService'
+import { SupabaseTimeEntryService } from './supabaseTimeEntryService'
 import {
   LEGACY_V1_TIME_ENTRY_STORAGE_KEY,
   LEGACY_V2_TIME_ENTRY_STORAGE_KEY,
@@ -525,9 +526,44 @@ export class LocalStorageTimeEntryService implements TimeEntryService {
   }
 }
 
-export const timeEntryService = new LocalStorageTimeEntryService({
+const localTimeEntryService = new LocalStorageTimeEntryService({
   storage: createBrowserStorage(),
   resolveAssignment: (collaboratorId) => profileService.resolveAssignment(collaboratorId),
   dateGuard: entryDateAvailabilityService,
   audit: auditService,
 })
+
+/**
+ * A sessão corporativa nunca grava no localStorage. O serviço local continua
+ * disponível para demonstração/testes quando não há sessão remota.
+ */
+class RuntimeTimeEntryService implements TimeEntryService {
+  private remote?: TimeEntryService
+
+  private active(): TimeEntryService {
+    if (typeof window === 'undefined') return localTimeEntryService
+    try {
+      const raw = window.localStorage.getItem('sma:api-session:v1')
+      if (raw) {
+        if (!this.remote) this.remote = new SupabaseTimeEntryService()
+        return this.remote
+      }
+    } catch {
+      // Se a sessão não puder ser lida, a chamada remota não é autorizada.
+    }
+    return localTimeEntryService
+  }
+
+  list(query: TimeEntryListQuery) { return this.active().list(query) }
+  listByDate(collaboratorId: string, date: string) { return this.active().listByDate(collaboratorId, date) }
+  listByRange(collaboratorId: string, startDate: string, endDate: string) { return this.active().listByRange(collaboratorId, startDate, endDate) }
+  getById(collaboratorId: string, id: string) { return this.active().getById(collaboratorId, id) }
+  create(collaboratorId: string, data: CreateTimeEntryData) { return this.active().create(collaboratorId, data) }
+  update(collaboratorId: string, id: string, expectedVersion: number, data: CreateTimeEntryData, reason: string) { return this.active().update(collaboratorId, id, expectedVersion, data, reason) }
+  duplicate(collaboratorId: string, id: string, expectedVersion: number, overrides: Partial<CreateTimeEntryData>) { return this.active().duplicate(collaboratorId, id, expectedVersion, overrides) }
+  cancel(collaboratorId: string, id: string, expectedVersion: number, reason: string) { return this.active().cancel(collaboratorId, id, expectedVersion, reason) }
+  clearAll() { return this.active().clearAll() }
+  getDailySummary(collaboratorId: string, date: string, workloadVersions: WorkloadVersion[]) { return this.active().getDailySummary(collaboratorId, date, workloadVersions) }
+}
+
+export const timeEntryService = new RuntimeTimeEntryService()

@@ -7,6 +7,7 @@
 export type EcosystemRole = 'colaborador' | 'supervisor' | 'diretor'
 
 export type EcosystemIdentity = {
+  profileId: string
   email: string
   nome: string
   role: EcosystemRole
@@ -78,7 +79,7 @@ export async function verifyBanco2Access(
     const userId = encodeURIComponent(user.id)
 
     // 2) Perfil corporativo ativo
-    const profileResponse = await fetchImpl(`${config.url}/rest/v1/profiles?id=eq.${userId}&select=email,full_name,role,active`, { headers: serviceHeaders })
+    const profileResponse = await fetchImpl(`${config.url}/rest/v1/profiles?id=eq.${userId}&select=id,email,full_name,role,active`, { headers: serviceHeaders })
     if (!profileResponse.ok) return fail(503, 'ecosystem_unavailable', 'Não foi possível consultar o perfil corporativo.')
     const profiles = await profileResponse.json() as Array<Record<string, unknown>>
     const profile = Array.isArray(profiles) ? profiles[0] : undefined
@@ -100,6 +101,7 @@ export async function verifyBanco2Access(
     return {
       ok: true,
       identity: {
+        profileId: user.id,
         email,
         nome: fullName,
         role: isRole(access.role) ? access.role : profile.role,

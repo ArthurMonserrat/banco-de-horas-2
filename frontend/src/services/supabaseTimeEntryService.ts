@@ -76,8 +76,8 @@ export class SupabaseTimeEntryService implements TimeEntryService {
     if (session.user.id !== collaboratorId) throw new Error('O apontamento deve pertencer ao usuário autenticado.')
     const result = await backendApi.createApontamento({
       data: data.entryDate,
-      horaInicio: '',
-      horaFim: '',
+      horaInicio: data.startTime ?? '',
+      horaFim: data.endTime ?? '',
       horasTotal: data.durationMinutes / 60,
       projeto: data.projectCode,
       atividade: data.activityId,

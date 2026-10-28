@@ -537,21 +537,24 @@ const localTimeEntryService = new LocalStorageTimeEntryService({
  * A sessão corporativa nunca grava no localStorage. O serviço local continua
  * disponível para demonstração/testes quando não há sessão remota.
  */
+/** Login Microsoft (sessão do Banco 2): os apontamentos vão direto para o banco de dados. */
+export function isRemoteTimeEntryStorageActive() {
+  if (typeof window === 'undefined') return false
+  try {
+    return Boolean(window.localStorage.getItem('sma:api-session:v1'))
+  } catch {
+    // Se a sessão não puder ser lida, a chamada remota não é autorizada.
+    return false
+  }
+}
+
 class RuntimeTimeEntryService implements TimeEntryService {
   private remote?: TimeEntryService
 
   private active(): TimeEntryService {
-    if (typeof window === 'undefined') return localTimeEntryService
-    try {
-      const raw = window.localStorage.getItem('sma:api-session:v1')
-      if (raw) {
-        if (!this.remote) this.remote = new SupabaseTimeEntryService()
-        return this.remote
-      }
-    } catch {
-      // Se a sessão não puder ser lida, a chamada remota não é autorizada.
-    }
-    return localTimeEntryService
+    if (!isRemoteTimeEntryStorageActive()) return localTimeEntryService
+    if (!this.remote) this.remote = new SupabaseTimeEntryService()
+    return this.remote
   }
 
   list(query: TimeEntryListQuery) { return this.active().list(query) }

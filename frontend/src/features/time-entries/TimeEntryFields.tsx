@@ -3,6 +3,7 @@ import { demoClients } from '../../mocks/demoData'
 import { formatDatePtBr } from '../../shared/utils/date'
 import { allTimeEntryActivities, requiresWorkSiteNumber } from './domain'
 import { parseRDO } from './rdoParser'
+import { manualRdoDurationMinutes, restoreRdoHours, setManualRdoTime, startManualRdoHours } from './rdoManualHours'
 import { findClientIdByRdoName } from './rdoClient'
 import type { ParsedRDODay } from './rdoParser'
 import type { TimeEntryValidationErrors } from './types'
@@ -53,6 +54,15 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
     .map((day) => `${formatDatePtBr(day.data)} (${formatRdoDayDuration(day)})`)
     .join(', ')
 
+  function toggleManualHours(enabled: boolean) {
+    onChange('rdoHoraManual', enabled)
+    onRdoDaysChange(enabled ? startManualRdoHours(extractedRdoDays) : restoreRdoHours(extractedRdoDays))
+  }
+
+  function changeManualTime(index: number, field: 'horaInicio' | 'horaFim', value: string) {
+    onRdoDaysChange(extractedRdoDays.map((day, position) => position === index ? setManualRdoTime(day, field, value) : day))
+  }
+
   async function handleRDOImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -63,6 +73,7 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
       const parsed = await parseRDO(file, { collaboratorName })
       let appliedFields = 0
       setMostrarTodosDias(false)
+      onChange('rdoHoraManual', false)
       onChange('emObra', true)
       onChange('activityId', '')
       const rdoClientId = findClientIdByRdoName(parsed.cliente)
@@ -140,12 +151,38 @@ export function TimeEntryFields({ values, errors, maxDate, allowBatchMode = true
                 {mostrarTodosDias ? 'Ocultar' : 'Ver todos'}
               </button>
             </div>
-            {mostrarTodosDias && (
+            <label className="mt-3 inline-flex items-center gap-2 text-sm font-extrabold">
+              <input type="checkbox" checked={values.rdoHoraManual} onChange={(event) => toggleManualHours(event.target.checked)} className="h-4 w-4 accent-[var(--color-primary)]" />
+              Colocar hora manual?
+            </label>
+            {values.rdoHoraManual && (
+              <p className="mt-1 font-normal">Informe o início e o fim de cada dia. As horas são calculadas descontando 1h de almoço.</p>
+            )}
+            {(mostrarTodosDias || values.rdoHoraManual) && (
               <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                {extractedRdoDays.map((day) => (
+                {extractedRdoDays.map((day, index) => (
                   <li key={day.data} className="rounded-lg border border-[var(--color-primary)]/30 bg-[var(--color-surface)]/70 px-3 py-2">
                     <span className="block font-extrabold">{formatDatePtBr(day.data)}</span>
-                    <span className="mt-1 block ui-text-muted">{formatRdoDayDuration(day)} lançadas</span>
+                    {values.rdoHoraManual ? (
+                      <>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <label className="text-[11px] font-bold">
+                            Início
+                            <input type="time" aria-label={`Hora de início em ${formatDatePtBr(day.data)}`} value={day.horaInicio ?? ''} onChange={(event) => changeManualTime(index, 'horaInicio', event.target.value)} className={fieldClassName} />
+                          </label>
+                          <label className="text-[11px] font-bold">
+                            Fim
+                            <input type="time" aria-label={`Hora de fim em ${formatDatePtBr(day.data)}`} value={day.horaFim ?? ''} onChange={(event) => changeManualTime(index, 'horaFim', event.target.value)} className={fieldClassName} />
+                          </label>
+                        </div>
+                        <span className="mt-1 block ui-text-muted">
+                          {manualRdoDurationMinutes(day.horaInicio, day.horaFim) === null ? 'Preencha início e fim' : `${formatRdoDayDuration(day)} lançadas (1h de almoço descontada)`}
+                          {day.horasRdo !== undefined && ` · RDO: ${day.horasRdo}h${String(day.minutosRdo ?? 0).padStart(2, '0')}`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="mt-1 block ui-text-muted">{formatRdoDayDuration(day)} lançadas</span>
+                    )}
                   </li>
                 ))}
               </ul>

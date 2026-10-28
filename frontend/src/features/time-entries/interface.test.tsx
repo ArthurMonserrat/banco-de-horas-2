@@ -13,7 +13,7 @@ import type { TimeEntryFormValues } from './useTimeEntryForm'
 
 const values: TimeEntryFormValues = {
   startDate: '2026-07-20', endDate: '2026-07-20', weekdaysOnly: true, emObra: false, numeroObra: '', clientId: '', projectCode: '', activityId: '', disciplineCode: 'C',
-  hours: '', minutes: '', startTime: '', endTime: '', isHoliday: false, hasOvertime: false, overtimeHours: '', overtimeMinutes: '', hasNightHours: false, nightHours: '', nightMinutes: '', hasPartialDayOff: false, partialDayOffHours: '', partialDayOffMinutes: '', details: '', funcaoContrato: '', numeroContrato: '', editReason: '',
+  hours: '', minutes: '', startTime: '', endTime: '', isHoliday: false, hasOvertime: false, overtimeHours: '', overtimeMinutes: '', hasNightHours: false, nightHours: '', nightMinutes: '', hasPartialDayOff: false, partialDayOffHours: '', partialDayOffMinutes: '', details: '', funcaoContrato: '', numeroContrato: '', rdoHoraManual: false, editReason: '',
 }
 
 const filters: HistoryFiltersValue = {

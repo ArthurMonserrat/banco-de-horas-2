@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { demoActivities, demoClients } from '../../mocks/demoData'
 import { entryDateAvailabilityService } from '../../services/entryDateAvailabilityService'
-import { timeEntryService } from '../../services/timeEntryService'
+import { isRemoteTimeEntryStorageActive, timeEntryService } from '../../services/timeEntryService'
 import { backendApi } from '../../services/api'
 import { buildApiApontamentoPayload, offlineQueueService } from '../../services/offlineQueueService'
 import type { ParsedRDODay } from './rdoParser'
 import type { CreateTimeEntryData, TimeEntry, TimeEntryValidationErrors } from './types'
 import { expandTimeEntryDates, NORMAL_WORKDAY_MINUTES, requiresWorkSiteNumber } from './domain'
-import { getCorporateToday, isIsoDate, isWeekend } from '../../shared/utils/date'
+import { formatDatePtBr, getCorporateToday, isIsoDate, isWeekend } from '../../shared/utils/date'
+import { validateManualRdoDays } from './rdoManualHours'
 import { useSession } from '../session/useSession'
 import { areValidDurationParts, hoursAndMinutesToMinutes, validateTimeEntry } from './domain'
 
@@ -38,6 +39,8 @@ export type TimeEntryFormValues = {
   details: string
   funcaoContrato: string
   numeroContrato: string
+  /** Importação de RDO: o colaborador informa início e fim de cada dia. */
+  rdoHoraManual: boolean
   editReason: string
 }
 
@@ -68,6 +71,7 @@ const emptyValues = (entryDate: string): TimeEntryFormValues => ({
   details: '',
   funcaoContrato: '',
   numeroContrato: '',
+  rdoHoraManual: false,
   editReason: '',
 })
 
@@ -99,6 +103,7 @@ function valuesFromEntry(entry: TimeEntry): TimeEntryFormValues {
     details: entry.details,
     funcaoContrato: entry.funcaoContrato ?? '',
     numeroContrato: entry.numeroContrato ?? '',
+    rdoHoraManual: false,
     editReason: '',
   }
 }
@@ -227,6 +232,11 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
     }
     if (mode === 'CREATE') {
       if (hasExtractedRdoDays) {
+        const manualError = values.rdoHoraManual ? validateManualRdoDays(extractedRdoDays, formatDatePtBr) : null
+        if (manualError) {
+          setSubmitError(manualError)
+          return false
+        }
         const invalidExtractedDay = extractedRdoDays.find((day) => !isIsoDate(day.data) || !day.detalhamento.trim() || !areValidDurationParts(day.horas, day.minutos))
         if (invalidExtractedDay) {
           setSubmitError('O RDO possui um ou mais dias com data, duração ou detalhamento inválido.')
@@ -251,16 +261,18 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
     }
 
     const syncOrQueueApontamentos = async (entries: CreateTimeEntryData[]) => {
+      // Com login Microsoft o timeEntryService já gravou no banco: reenviar duplicaria o apontamento.
+      if (isRemoteTimeEntryStorageActive()) return
       const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
       for (const entry of entries) {
         const payload = buildApiApontamentoPayload(profile.id, entry, {
-          startTime: values.startTime,
-          endTime: values.endTime,
+          startTime: entry.startTime ?? values.startTime,
+          endTime: entry.endTime ?? values.endTime,
         })
         if (!isOnline) {
           offlineQueueService.enqueueApontamento(profile.id, entry, {
-            startTime: values.startTime,
-            endTime: values.endTime,
+            startTime: entry.startTime ?? values.startTime,
+            endTime: entry.endTime ?? values.endTime,
           })
           continue
         }
@@ -268,8 +280,8 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
           await backendApi.createApontamento(payload)
         } catch {
           offlineQueueService.enqueueApontamento(profile.id, entry, {
-            startTime: values.startTime,
-            endTime: values.endTime,
+            startTime: entry.startTime ?? values.startTime,
+            endTime: entry.endTime ?? values.endTime,
           })
         }
       }
@@ -302,6 +314,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
             nightMinutes: 0,
             partialDayOffMinutes: 0,
             details: day.detalhamento,
+            ...(values.rdoHoraManual ? { startTime: day.horaInicio, endTime: day.horaFim } : {}),
           }))
           await Promise.all(extractedEntries.map((entry) => timeEntryService.create(profile.id, entry)))
           await syncOrQueueApontamentos(extractedEntries)

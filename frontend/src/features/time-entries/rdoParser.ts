@@ -7,6 +7,12 @@ export type ParsedRDODay = {
   minutos: number
   detalhamento: string
   numeroObra: string
+  /** Hora manual: início e fim informados pelo colaborador (horas = fim − início − 1h de almoço). */
+  horaInicio?: string
+  horaFim?: string
+  /** Horas lidas do RDO, guardadas enquanto a hora manual estiver ligada. */
+  horasRdo?: number
+  minutosRdo?: number
 }
 
 export type ParsedRDO = {

@@ -1,4 +1,5 @@
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import { isMedicaoRdo, parseMedicaoRdoPages, type RdoPage } from './rdoMedicaoParser'
 
 export type ParsedRDODay = {
   data: string
@@ -9,8 +10,18 @@ export type ParsedRDODay = {
 }
 
 export type ParsedRDO = {
+  /** padrao = RDO por "Total de Horas"; medicao = planilha por profissional (ex.: ArcelorMittal). */
+  modelo?: 'padrao' | 'medicao'
   numeroObra?: string
+  numeroContrato?: string
+  cliente?: string
+  aviso?: string
   dias: ParsedRDODay[]
+}
+
+export type ParseRDOOptions = {
+  /** Nome do usuário logado: no modelo por profissional, só as horas dele são lidas. */
+  collaboratorName?: string
 }
 
 type TextContentItem = {
@@ -252,7 +263,25 @@ export function parseRDOText(text: string): ParsedRDO {
   }
 }
 
-export async function parseRDO(file: File): Promise<ParsedRDO> {
+export function parseRDOPages(pages: RdoPage[], options: ParseRDOOptions = {}): ParsedRDO {
+  if (isMedicaoRdo(pages)) {
+    const parsed = parseMedicaoRdoPages(pages, options)
+    return {
+      modelo: 'medicao',
+      numeroObra: parsed.numeroObra,
+      numeroContrato: parsed.numeroContrato,
+      cliente: parsed.cliente,
+      aviso: parsed.aviso,
+      dias: parsed.dias.map(({ data, horas, minutos, detalhamento, numeroObra }) => ({ data, horas, minutos, detalhamento, numeroObra })),
+    }
+  }
+  const text = pages
+    .map((page, index) => `\n--- Página ${index + 1} ---\n${textItemsToRows(page.map((item) => ({ str: item.text, transform: [1, 0, 0, 1, item.x, item.y] })))}\n`)
+    .join('\n')
+  return { modelo: 'padrao', ...parseRDOText(text) }
+}
+
+export async function parseRDO(file: File, options: ParseRDOOptions = {}): Promise<ParsedRDO> {
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
   const buffer = await file.arrayBuffer()
@@ -260,18 +289,22 @@ export async function parseRDO(file: File): Promise<ParsedRDO> {
 
   try {
     const pageNumbers = Array.from({ length: pdf.numPages }, (_, index) => index + 1)
-    const pagesText = await Promise.all(pageNumbers.map(async (pageNumber) => {
+    const pages = await Promise.all(pageNumbers.map(async (pageNumber): Promise<RdoPage> => {
       const page = await pdf.getPage(pageNumber)
       try {
         const content = await page.getTextContent()
-        const pageText = textItemsToRows(content.items as TextContentItem[])
-        return `\n--- Página ${pageNumber} ---\n${pageText}\n`
+        return (content.items as TextContentItem[]).flatMap((item) => {
+          const text = item.str?.trim()
+          if (!text) return []
+          const { x, y } = getTextItemPosition(item)
+          return [{ text, x, y }]
+        })
       } finally {
         page.cleanup()
       }
     }))
 
-    return parseRDOText(pagesText.join('\n'))
+    return parseRDOPages(pages, options)
   } finally {
     await pdf.cleanup()
   }

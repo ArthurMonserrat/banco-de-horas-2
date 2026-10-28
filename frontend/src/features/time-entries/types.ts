@@ -11,6 +11,8 @@ export interface TimeEntry {
   entryDate: string
   emObra: boolean
   numeroObra?: string
+  /** Número do contrato / pedido de compra do cliente (ex.: lido do RDO). */
+  numeroContrato?: string
   clientId: string
   projectCode: string
   activityId: string
@@ -49,6 +51,7 @@ export type CreateTimeEntryData = Pick<
 > & {
   emObra?: boolean
   numeroObra?: string
+  numeroContrato?: string
   endDate?: string
   weekdaysOnly?: boolean
   dayType?: TimeEntryDayType

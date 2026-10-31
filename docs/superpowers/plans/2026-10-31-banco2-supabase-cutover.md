@@ -78,7 +78,7 @@ Expected: 23 API tests and 376 frontend tests pass.
 
 - [ ] **Step 1: Run the existing API/frontend suites and inspect the migration contract for `banco2.apontamentos`.**
 - [ ] **Step 2: If local Supabase/Docker is available, apply only versioned migrations to a disposable instance and run owner/supervisor/director isolation checks.**
-- [ ] **Step 3: If unavailable, report the exact environment blocker rather than claiming managed validation.**
+- [x] **Step 3: If unavailable, report the exact environment blocker rather than claiming managed validation.** Local `supabase` CLI is not installed and Docker Desktop is not running.
 - [ ] **Step 4: Run `git diff --check`, root typecheck, frontend typecheck, lint, and build.**
 - [ ] **Step 5: Commit:** `test: validate Banco 2 Supabase persistence locally` only if files changed.
 

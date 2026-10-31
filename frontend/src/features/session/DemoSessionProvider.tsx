@@ -9,6 +9,7 @@ import { SessionContext } from './sessionContext'
 import { toEcosystemSession } from './ecosystemSession'
 import type { DemoRole, DemoSession } from './types'
 import type { CollaboratorProfile } from '../profile/types'
+import { clearBanco2LocalBusinessData } from '../../services/banco2Storage'
 
 type ProviderProps = {
   children: ReactNode
@@ -37,6 +38,7 @@ export function DemoSessionProvider({ children, allowDemo = demoModeEnabled }: P
       }
       try {
         const { user } = await backendApi.validateSession(stored.token)
+        clearBanco2LocalBusinessData()
         const refreshed: ApiSession = { token: stored.token, user }
         saveApiSession(refreshed)
         if (!cancelled) setSession(toEcosystemSession(refreshed))
@@ -90,6 +92,7 @@ export function DemoSessionProvider({ children, allowDemo = demoModeEnabled }: P
   const signInWithBanco2Session = (apiSession: ApiSession) => {
     const created = toEcosystemSession(apiSession)
     if (!created) throw new Error('Sessão do Banco 2 inválida.')
+    clearBanco2LocalBusinessData()
     saveApiSession(apiSession)
     setSession(created)
     return created

@@ -13,6 +13,10 @@ import { profileService } from './profileService'
 import type { EntryDateBlock } from '../features/calendar/entryDatePolicy'
 import { entryDateAvailabilityService } from './entryDateAvailabilityService'
 import { SupabaseTimeEntryService } from './supabaseTimeEntryService'
+import { getStoredApiSession } from './api'
+import { demoModeEnabled } from '../config/ecosystemAuth'
+import { demoSessionService } from './demoSessionService'
+import { clearBanco2LocalBusinessData } from './banco2Storage'
 import {
   LEGACY_V1_TIME_ENTRY_STORAGE_KEY,
   LEGACY_V2_TIME_ENTRY_STORAGE_KEY,
@@ -537,33 +541,60 @@ const localTimeEntryService = new LocalStorageTimeEntryService({
  * A sessão corporativa nunca grava no localStorage. O serviço local continua
  * disponível para demonstração/testes quando não há sessão remota.
  */
-class RuntimeTimeEntryService implements TimeEntryService {
-  private remote?: TimeEntryService
+export type RuntimeTimeEntryDependencies = {
+  local?: TimeEntryService
+  remoteFactory?: () => TimeEntryService
+  getApiSession?: () => unknown
+  isDemoSession?: () => boolean
+  clearLocalBusinessData?: () => void
+}
 
-  private active(): TimeEntryService {
-    if (typeof window === 'undefined') return localTimeEntryService
-    try {
-      const raw = window.localStorage.getItem('sma:api-session:v1')
-      if (raw) {
-        if (!this.remote) this.remote = new SupabaseTimeEntryService()
-        return this.remote
-      }
-    } catch {
-      // Se a sessão não puder ser lida, a chamada remota não é autorizada.
-    }
-    return localTimeEntryService
+export class RuntimeTimeEntryService implements TimeEntryService {
+  private readonly local: TimeEntryService
+  private readonly remoteFactory: () => TimeEntryService
+  private readonly getApiSession: () => unknown
+  private readonly isDemoSession: () => boolean
+  private readonly clearLocalBusinessData: () => void
+  private remote?: TimeEntryService
+  private corporateStorageCleared = false
+
+  constructor({
+    local = localTimeEntryService,
+    remoteFactory = () => new SupabaseTimeEntryService(),
+    getApiSession = getStoredApiSession,
+    isDemoSession = () => demoModeEnabled && demoSessionService.restore() !== null,
+    clearLocalBusinessData = clearBanco2LocalBusinessData,
+  }: RuntimeTimeEntryDependencies = {}) {
+    this.local = local
+    this.remoteFactory = remoteFactory
+    this.getApiSession = getApiSession
+    this.isDemoSession = isDemoSession
+    this.clearLocalBusinessData = clearLocalBusinessData
   }
 
-  list(query: TimeEntryListQuery) { return this.active().list(query) }
-  listByDate(collaboratorId: string, date: string) { return this.active().listByDate(collaboratorId, date) }
-  listByRange(collaboratorId: string, startDate: string, endDate: string) { return this.active().listByRange(collaboratorId, startDate, endDate) }
-  getById(collaboratorId: string, id: string) { return this.active().getById(collaboratorId, id) }
-  create(collaboratorId: string, data: CreateTimeEntryData) { return this.active().create(collaboratorId, data) }
-  update(collaboratorId: string, id: string, expectedVersion: number, data: CreateTimeEntryData, reason: string) { return this.active().update(collaboratorId, id, expectedVersion, data, reason) }
-  duplicate(collaboratorId: string, id: string, expectedVersion: number, overrides: Partial<CreateTimeEntryData>) { return this.active().duplicate(collaboratorId, id, expectedVersion, overrides) }
-  cancel(collaboratorId: string, id: string, expectedVersion: number, reason: string) { return this.active().cancel(collaboratorId, id, expectedVersion, reason) }
-  clearAll() { return this.active().clearAll() }
-  getDailySummary(collaboratorId: string, date: string, workloadVersions: WorkloadVersion[]) { return this.active().getDailySummary(collaboratorId, date, workloadVersions) }
+  private active(): TimeEntryService {
+    if (this.getApiSession()) {
+      if (!this.corporateStorageCleared) {
+        this.clearLocalBusinessData()
+        this.corporateStorageCleared = true
+      }
+      if (!this.remote) this.remote = this.remoteFactory()
+      return this.remote
+    }
+    if (this.isDemoSession()) return this.local
+    throw new Error('Sessão corporativa ausente ou modo de demonstração desativado.')
+  }
+
+  async list(query: TimeEntryListQuery) { return this.active().list(query) }
+  async listByDate(collaboratorId: string, date: string) { return this.active().listByDate(collaboratorId, date) }
+  async listByRange(collaboratorId: string, startDate: string, endDate: string) { return this.active().listByRange(collaboratorId, startDate, endDate) }
+  async getById(collaboratorId: string, id: string) { return this.active().getById(collaboratorId, id) }
+  async create(collaboratorId: string, data: CreateTimeEntryData) { return this.active().create(collaboratorId, data) }
+  async update(collaboratorId: string, id: string, expectedVersion: number, data: CreateTimeEntryData, reason: string) { return this.active().update(collaboratorId, id, expectedVersion, data, reason) }
+  async duplicate(collaboratorId: string, id: string, expectedVersion: number, overrides: Partial<CreateTimeEntryData>) { return this.active().duplicate(collaboratorId, id, expectedVersion, overrides) }
+  async cancel(collaboratorId: string, id: string, expectedVersion: number, reason: string) { return this.active().cancel(collaboratorId, id, expectedVersion, reason) }
+  async clearAll() { return this.active().clearAll() }
+  async getDailySummary(collaboratorId: string, date: string, workloadVersions: WorkloadVersion[]) { return this.active().getDailySummary(collaboratorId, date, workloadVersions) }
 }
 
 export const timeEntryService = new RuntimeTimeEntryService()

@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { demoActivities, demoClients } from '../../mocks/demoData'
 import { entryDateAvailabilityService } from '../../services/entryDateAvailabilityService'
 import { timeEntryService } from '../../services/timeEntryService'
-import { backendApi } from '../../services/api'
-import { buildApiApontamentoPayload, offlineQueueService } from '../../services/offlineQueueService'
 import type { ParsedRDODay } from './rdoParser'
 import type { CreateTimeEntryData, TimeEntry, TimeEntryValidationErrors } from './types'
 import { expandTimeEntryDates, NORMAL_WORKDAY_MINUTES, requiresWorkSiteNumber } from './domain'
@@ -101,6 +99,14 @@ function valuesFromEntry(entry: TimeEntry): TimeEntryFormValues {
 }
 
 type FormMode = 'CREATE' | 'EDIT' | 'DUPLICATE'
+
+export async function persistEntries(
+  collaboratorId: string,
+  entries: CreateTimeEntryData[],
+  persist: (collaboratorId: string, entry: CreateTimeEntryData) => Promise<TimeEntry>,
+) {
+  return Promise.all(entries.map((entry) => persist(collaboratorId, entry)))
+}
 
 export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initialDate: string; entryId?: string; duplicateId?: string }) {
   const { profile } = useSession()
@@ -246,31 +252,6 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       return false
     }
 
-    const syncOrQueueApontamentos = async (entries: CreateTimeEntryData[]) => {
-      const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
-      for (const entry of entries) {
-        const payload = buildApiApontamentoPayload(profile.id, entry, {
-          startTime: values.startTime,
-          endTime: values.endTime,
-        })
-        if (!isOnline) {
-          offlineQueueService.enqueueApontamento(profile.id, entry, {
-            startTime: values.startTime,
-            endTime: values.endTime,
-          })
-          continue
-        }
-        try {
-          await backendApi.createApontamento(payload)
-        } catch {
-          offlineQueueService.enqueueApontamento(profile.id, entry, {
-            startTime: values.startTime,
-            endTime: values.endTime,
-          })
-        }
-      }
-    }
-
     setIsSubmitting(true)
     try {
       if (mode === 'EDIT' && source) {
@@ -280,7 +261,6 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
         setSuccessMessage('Apontamento atualizado com sucesso.')
       } else if (mode === 'DUPLICATE' && source) {
         await timeEntryService.duplicate(profile.id, source.id, source.version, data)
-        await syncOrQueueApontamentos([data])
         setSuccessMessage('Apontamento duplicado com sucesso.')
       } else {
         if (hasExtractedRdoDays) {
@@ -299,18 +279,16 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
             partialDayOffMinutes: 0,
             details: day.detalhamento,
           }))
-          await Promise.all(extractedEntries.map((entry) => timeEntryService.create(profile.id, entry)))
-          await syncOrQueueApontamentos(extractedEntries)
+          await persistEntries(profile.id, extractedEntries, (collaboratorId, entry) => timeEntryService.create(collaboratorId, entry))
           setSuccessMessage(`${extractedRdoDays.length} lançamentos do RDO salvos individualmente com sucesso.`)
         } else {
-          await timeEntryService.create(profile.id, data)
           const entriesToSync = periodDates.map((date) => ({
             ...data,
             entryDate: date,
             endDate: date,
             weekdaysOnly: false,
           }))
-          await syncOrQueueApontamentos(entriesToSync)
+          await persistEntries(profile.id, entriesToSync, (collaboratorId, entry) => timeEntryService.create(collaboratorId, entry))
           setSuccessMessage(periodDates.length > 1
             ? `${periodDates.length} lançamentos salvos com sucesso para o período selecionado.`
             : 'Apontamento salvo com sucesso.')
@@ -324,7 +302,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       }
       return true
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar o apontamento localmente.')
+      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar o apontamento no servidor.')
       return false
     } finally {
       setIsSubmitting(false)

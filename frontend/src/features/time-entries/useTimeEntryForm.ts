@@ -110,6 +110,14 @@ function valuesFromEntry(entry: TimeEntry): TimeEntryFormValues {
 
 type FormMode = 'CREATE' | 'EDIT' | 'DUPLICATE'
 
+export async function persistEntries(
+  collaboratorId: string,
+  entries: CreateTimeEntryData[],
+  persist: (collaboratorId: string, entry: CreateTimeEntryData) => Promise<TimeEntry>,
+) {
+  return Promise.all(entries.map((entry) => persist(collaboratorId, entry)))
+}
+
 export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initialDate: string; entryId?: string; duplicateId?: string }) {
   const { profile } = useSession()
   const mode: FormMode = entryId ? 'EDIT' : duplicateId ? 'DUPLICATE' : 'CREATE'
@@ -316,17 +324,17 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
             details: day.detalhamento,
             ...(values.rdoHoraManual ? { startTime: day.horaInicio, endTime: day.horaFim } : {}),
           }))
-          await Promise.all(extractedEntries.map((entry) => timeEntryService.create(profile.id, entry)))
+          await persistEntries(profile.id, extractedEntries, (collaboratorId, entry) => timeEntryService.create(collaboratorId, entry))
           await syncOrQueueApontamentos(extractedEntries)
           setSuccessMessage(`${extractedRdoDays.length} lançamentos do RDO salvos individualmente com sucesso.`)
         } else {
-          await timeEntryService.create(profile.id, data)
           const entriesToSync = periodDates.map((date) => ({
             ...data,
             entryDate: date,
             endDate: date,
             weekdaysOnly: false,
           }))
+          await persistEntries(profile.id, entriesToSync, (collaboratorId, entry) => timeEntryService.create(collaboratorId, entry))
           await syncOrQueueApontamentos(entriesToSync)
           setSuccessMessage(periodDates.length > 1
             ? `${periodDates.length} lançamentos salvos com sucesso para o período selecionado.`
@@ -341,7 +349,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       }
       return true
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar o apontamento localmente.')
+      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar o apontamento.')
       return false
     } finally {
       setIsSubmitting(false)

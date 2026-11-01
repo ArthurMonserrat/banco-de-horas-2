@@ -6,6 +6,7 @@ import {
   LEGACY_V1_TIME_ENTRY_STORAGE_KEY,
   LEGACY_V2_TIME_ENTRY_STORAGE_KEY,
   LocalStorageTimeEntryService,
+  RuntimeTimeEntryService,
   TIME_ENTRY_STORAGE_KEY,
   type StorageLike,
 } from './timeEntryService'
@@ -579,5 +580,32 @@ describe('comandos e consultas de apontamento', () => {
     await expect(service.listByDate(collaboratorId, validData.entryDate)).resolves.toHaveLength(1)
     expect(created.id).toBe('stable-entry-id')
     expect(onAuditError).toHaveBeenCalledWith('Não foi possível registrar a auditoria da mutação confirmada.', auditError)
+  })
+})
+
+describe('seleção segura da persistência corporativa', () => {
+  const query = { collaboratorId, startDate: '2026-07-01', endDate: '2026-07-31', pageSize: 20 }
+
+  it('não usa localStorage quando não existe sessão corporativa nem modo demo explícito', async () => {
+    const local = { list: vi.fn(), listByDate: vi.fn(), listByRange: vi.fn(), getById: vi.fn(), create: vi.fn(), update: vi.fn(), duplicate: vi.fn(), cancel: vi.fn(), clearAll: vi.fn(), getDailySummary: vi.fn() }
+    const remote = { list: vi.fn(), listByDate: vi.fn(), listByRange: vi.fn(), getById: vi.fn(), create: vi.fn(), update: vi.fn(), duplicate: vi.fn(), cancel: vi.fn(), clearAll: vi.fn(), getDailySummary: vi.fn() }
+    const service = new RuntimeTimeEntryService({ local: local as never, remoteFactory: () => remote as never, getApiSession: () => null, isDemoSession: () => false })
+
+    await expect(service.list(query)).rejects.toThrow('Sessão corporativa ausente')
+    expect(local.list).not.toHaveBeenCalled()
+    expect(remote.list).not.toHaveBeenCalled()
+  })
+
+  it('prioriza a persistência Supabase quando existe sessão corporativa', async () => {
+    const local = { list: vi.fn(), listByDate: vi.fn(), listByRange: vi.fn(), getById: vi.fn(), create: vi.fn(), update: vi.fn(), duplicate: vi.fn(), cancel: vi.fn(), clearAll: vi.fn(), getDailySummary: vi.fn() }
+    const remote = { ...local, list: vi.fn(async () => ({ items: [], nextCursor: null, total: 0 })) }
+    const clearLocalBusinessData = vi.fn()
+    const service = new RuntimeTimeEntryService({ local: local as never, remoteFactory: () => remote as never, getApiSession: () => ({ token: 'synthetic' }), isDemoSession: () => true, clearLocalBusinessData })
+
+    await expect(service.list(query)).resolves.toEqual({ items: [], nextCursor: null, total: 0 })
+    expect(remote.list).toHaveBeenCalledOnce()
+    expect(local.list).not.toHaveBeenCalled()
+    await service.list(query)
+    expect(clearLocalBusinessData).toHaveBeenCalledOnce()
   })
 })

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Make Banco 2 use the shared Supabase session and `banco2` schema for corporate persistence, without copying Banco 1 users, roles, or entries and without touching production.
+**Goal:** Make Banco 2 use the shared Supabase session and `banco2` schema for corporate persistence, without copying Banco 1 users, roles, or entries. The authorized remote migration has been applied without deleting existing rows; Production promotion remains pending.
 
 **Architecture:** Reuse the shared Supabase Auth/profile identity from Banco 1. Keep Banco 2 operational rows in `banco2.apontamentos`, accessed through the existing server-side Supabase Data API client and protected by RLS. Remove Prisma/localStorage as a corporate data source; retain localStorage only for explicitly non-business UI state.
 
@@ -12,7 +12,9 @@
 
 ## Global Constraints
 
-- Do not modify Supabase production, Azure, Vercel variables, or remote migrations.
+- Do not modify Azure or Vercel variables without a separate explicit authorization.
+- The authorized Supabase project was reconciled with the versioned Banco 2 migration; no rows were deleted or updated.
+- Do not perform the future data reset in the same change as the runtime cutover.
 - Do not copy Banco 1 users, roles, profiles, or time entries into Banco 2.
 - Do not expose `service_role` or database credentials to the browser.
 - Corporate operations must fail with an explicit error when Supabase persistence is unavailable; never silently fall back to localStorage.
@@ -25,6 +27,19 @@
 - Missing Supabase configuration must produce a controlled unavailable state.
 - Legacy localStorage data must not be read by the corporate persistence path.
 - The Banco 2 schema and authentication headers must remain explicit and testable.
+
+## Future controlled data reset
+
+The existing local/browser and remote Banco 2 test data are intentionally preserved for validation. A later, separately approved operation may reset them after:
+
+1. confirming that no real Banco 2 records need preservation;
+2. exporting only non-sensitive structural evidence and obtaining a restorable backup;
+3. freezing writes and recording row counts/fingerprints;
+4. clearing browser business keys (`apontamentos_sma`, versioned time-entry keys, and `@sma_offline_queue`) without removing session, theme, or onboarding state;
+5. truncating or deleting remote Banco 2 rows only through a reviewed, versioned operation;
+6. rerunning owner, supervisor, director, and anonymous-access checks.
+
+Until that operation is explicitly approved, the cutover must preserve the 54 existing remote rows and must not silently erase browser data.
 
 ### Task 1: Document the cutover boundary
 

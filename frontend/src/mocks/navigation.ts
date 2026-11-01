@@ -15,4 +15,5 @@ export const directorNavigation: NavigationItem[] = [
   { label: 'Histórico', icon: 'history', path: '/administracao/historico' },
   { label: 'Relatórios', icon: 'bar-chart', path: '/relatorios' },
   { label: 'Avisos', icon: 'bell', path: '/avisos' },
+  { label: 'Meu perfil', icon: 'user', path: '/administracao/perfil' },
 ]

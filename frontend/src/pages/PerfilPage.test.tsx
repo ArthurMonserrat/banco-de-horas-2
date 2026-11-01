@@ -7,6 +7,7 @@ import type { useProfile } from '../features/collaborator/useProfile'
 import { PerfilPage } from './PerfilPage'
 
 const { useProfileMock } = vi.hoisted(() => ({ useProfileMock: vi.fn() }))
+vi.mock('../features/profile/useCorporateIdentity', () => ({ useCorporateIdentity: () => null }))
 vi.mock('../features/collaborator/useProfile', () => ({ useProfile: useProfileMock }))
 
 const signature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='

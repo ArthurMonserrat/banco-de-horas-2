@@ -15,6 +15,9 @@ import { filterSupervisorHistoryEntries, type HistoryStatusFilter, type Supervis
 import type { SupervisorPendingEntry, SupervisorTimeOffRequest } from '../features/supervisor/types'
 import { useSupervisorDashboard } from '../features/supervisor/useSupervisorDashboard'
 import { useSession } from '../features/session/useSession'
+import { SwitchSystemButton } from '../components/SwitchSystemButton'
+import { useCorporateIdentity } from '../features/profile/useCorporateIdentity'
+import { CorporateIdentityPanel } from '../features/profile/CorporateIdentityPanel'
 import { formatMinutes } from '../features/time-entries/domain'
 import { getCorporateToday, getTimesheetCycle, isIsoDate } from '../shared/utils/date'
 import { getAllColaboradores } from '../data/mockDEP'
@@ -104,7 +107,7 @@ function SupervisorSidebar({ activeView, profile, onChange, onSignOut }: {
     >
       <section className="border-b border-[var(--color-sidebar-border)] p-4" aria-label="Perfil atual do supervisor">
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-sm font-extrabold">JA</span>
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-sm font-extrabold">{profile.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toLocaleUpperCase('pt-BR') || '?'}</span>
           <div className="min-w-0">
             <p className="text-sm font-extrabold leading-tight">{profile.name}</p>
             <p className="mt-0.5 text-xs leading-tight text-[var(--color-sidebar-text-muted)]">{profile.jobTitle}</p>
@@ -139,6 +142,7 @@ function SupervisorSidebar({ activeView, profile, onChange, onSignOut }: {
       </nav>
 
       <div className="border-t border-[var(--color-sidebar-border)] p-4">
+        <SwitchSystemButton />
         <button type="button" onClick={onSignOut} className="w-full rounded-xl border border-[var(--color-sidebar-border)] px-4 py-3 text-left text-sm font-bold text-[var(--color-sidebar-text)] hover:bg-[var(--color-navigation-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-sidebar-text)]">
           Sair do sistema
         </button>
@@ -345,6 +349,11 @@ export function SupervisorPage() {
   const [appliedRange, setAppliedRange] = useState(cycleRange)
   const [rangeError, setRangeError] = useState<string | null>(null)
   const [supervisorProfile, setSupervisorProfile] = useState<SupervisorProfile>(() => readSupervisorProfile())
+  // Login Microsoft: nome, e-mail e cargo vêm da conta corporativa, não do perfil local de demonstração.
+  const corporateIdentity = useCorporateIdentity()
+  const displayedProfile: SupervisorProfile = corporateIdentity
+    ? { ...supervisorProfile, name: corporateIdentity.fullName, email: corporateIdentity.email, jobTitle: corporateIdentity.roleLabel }
+    : supervisorProfile
   const [collaboratorFilter, setCollaboratorFilter] = useState('Todos')
   const [statusFilter, setStatusFilter] = useState<EntryStatusFilter>('ALL')
   const [filtroProjeto, setFiltroProjeto] = useState('Todos')
@@ -560,13 +569,13 @@ export function SupervisorPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-            <span className="hidden text-right text-xs font-semibold text-[var(--color-text-muted)] md:block">{supervisorProfile.name}</span>
+            <span className="hidden text-right text-xs font-semibold text-[var(--color-text-muted)] md:block">{displayedProfile.name}</span>
           <ThemeToggle />
         </div>
       </header>
 
       <section data-layout-body className="relative grid min-h-[calc(100vh-5rem)] min-w-0 grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <SupervisorSidebar activeView={activeView} profile={supervisorProfile} onChange={setActiveView} onSignOut={exitDemo} />
+        <SupervisorSidebar activeView={activeView} profile={displayedProfile} onChange={setActiveView} onSignOut={exitDemo} />
 
         <div className="mx-auto w-full min-w-0 max-w-7xl p-4 sm:p-6 lg:p-8">
           <div className="mb-6">
@@ -727,7 +736,9 @@ export function SupervisorPage() {
             )}
 
             {activeView === 'history' && <HistoryView entries={dashboard.entries} onClearHistory={clearSupervisorHistory} />}
-            {activeView === 'profile' && <SupervisorProfileView profile={supervisorProfile} onSave={updateSupervisorProfile} />}
+            {activeView === 'profile' && (corporateIdentity
+              ? <CorporateIdentityPanel identity={corporateIdentity} />
+              : <SupervisorProfileView profile={supervisorProfile} onSave={updateSupervisorProfile} />)}
             {activeView === 'announcements' && <AvisosPage />}
           </div>
         </div>

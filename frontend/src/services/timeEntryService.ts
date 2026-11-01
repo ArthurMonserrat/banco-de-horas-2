@@ -541,6 +541,11 @@ const localTimeEntryService = new LocalStorageTimeEntryService({
  * A sessão corporativa nunca grava no localStorage. O serviço local continua
  * disponível para demonstração/testes quando não há sessão remota.
  */
+/** Login Microsoft (sessão do Banco 2): os apontamentos vão direto para o banco de dados. */
+export function isRemoteTimeEntryStorageActive() {
+  return Boolean(getStoredApiSession())
+}
+
 export type RuntimeTimeEntryDependencies = {
   local?: TimeEntryService
   remoteFactory?: () => TimeEntryService

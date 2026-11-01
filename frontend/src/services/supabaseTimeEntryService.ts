@@ -17,6 +17,7 @@ function fromApi(entry: Awaited<ReturnType<typeof backendApi.listApontamentos>>[
     entryDate: entry.data,
     emObra: Boolean(entry.emObra),
     numeroObra: entry.numeroObra,
+    numeroContrato: entry.numeroContrato,
     clientId: entry.clientId ?? '',
     projectCode: entry.projeto,
     activityId: entry.atividade,
@@ -75,8 +76,8 @@ export class SupabaseTimeEntryService implements TimeEntryService {
     if (session.user.id !== collaboratorId) throw new Error('O apontamento deve pertencer ao usuário autenticado.')
     const result = await backendApi.createApontamento({
       data: data.entryDate,
-      horaInicio: '',
-      horaFim: '',
+      horaInicio: data.startTime ?? '',
+      horaFim: data.endTime ?? '',
       horasTotal: data.durationMinutes / 60,
       projeto: data.projectCode,
       atividade: data.activityId,
@@ -85,6 +86,7 @@ export class SupabaseTimeEntryService implements TimeEntryService {
       disciplineCode: data.disciplineCode,
       emObra: data.emObra,
       numeroObra: data.numeroObra,
+      numeroContrato: data.numeroContrato || undefined,
       funcaoContrato: data.funcaoContrato,
     })
     return fromApi(result.apontamento)
@@ -103,6 +105,7 @@ export class SupabaseTimeEntryService implements TimeEntryService {
       disciplineCode: data.disciplineCode,
       emObra: data.emObra,
       numeroObra: data.numeroObra,
+      numeroContrato: data.numeroContrato || undefined,
       funcaoContrato: data.funcaoContrato,
     }, expectedVersion, reason)
     return fromApi(result.apontamento)

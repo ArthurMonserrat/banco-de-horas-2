@@ -5,6 +5,7 @@ import { FieldError, fieldClassName, TimeEntryFields } from './TimeEntryFields'
 import { formatMinutes, hoursAndMinutesToMinutes, NORMAL_WORKDAY_MINUTES } from './domain'
 import { useTimeEntryForm } from './useTimeEntryForm'
 import { CreateRdoButton } from '../rdo/CreateRdoButton'
+import { useSession } from '../session/useSession'
 
 function hourMinuteFields({
   idPrefix,
@@ -45,6 +46,7 @@ export function TimeEntryForm({ entryId }: { entryId?: string }) {
   const location = useLocation()
   const formRef = useRef<HTMLFormElement>(null)
   const [entryMode, setEntryMode] = useState<'manual' | 'rdo'>('manual')
+  const { session, profile } = useSession()
   const navigationState = location.state as { initialDate?: string; selectedDate?: string } | null
   const routedInitialDate = searchParams.get('date') ?? navigationState?.initialDate ?? navigationState?.selectedDate
   const controller = useTimeEntryForm({
@@ -67,6 +69,10 @@ export function TimeEntryForm({ entryId }: { entryId?: string }) {
     setEntryMode(mode)
     controller.setField('emObra', mode === 'rdo')
     controller.setField('activityId', '')
+    // Na importação de RDO o horário vem de cada dia (hora manual), não dos campos gerais.
+    controller.setField('startTime', '')
+    controller.setField('endTime', '')
+    controller.setField('rdoHoraManual', false)
     if (mode === 'manual') {
       controller.setField('numeroObra', '')
       controller.setExtractedRdoDays([])
@@ -116,6 +122,7 @@ export function TimeEntryForm({ entryId }: { entryId?: string }) {
         entryMode={entryMode}
         extractedRdoDays={controller.extractedRdoDays}
         onRdoDaysChange={controller.setExtractedRdoDays}
+        collaboratorName={profile?.name ?? session?.name}
         onChange={controller.setField}
       />
 
@@ -217,7 +224,7 @@ export function TimeEntryForm({ entryId }: { entryId?: string }) {
         <FieldError id="partial-day-off-error" message={controller.errors.partialDayOffMinutes} />
       </fieldset>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {entryMode !== 'rdo' && <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="start-time" className="text-sm font-bold ui-text">Hora de início</label>
           <input id="start-time" name="startTime" type="time" value={controller.values.startTime} onChange={(event) => controller.setField('startTime', event.target.value)} className={fieldClassName} aria-describedby="time-help" />
@@ -227,7 +234,7 @@ export function TimeEntryForm({ entryId }: { entryId?: string }) {
           <input id="end-time" name="endTime" type="time" value={controller.values.endTime} onChange={(event) => controller.setField('endTime', event.target.value)} className={fieldClassName} aria-describedby="time-help" />
         </div>
         <p id="time-help" className="text-xs ui-text-subtle sm:col-span-2">Esses horários são usados na geração do RDO e são opcionais no apontamento.</p>
-      </div>
+      </div>}
 
       <div>
         <label htmlFor="details" className="text-sm font-bold ui-text">Detalhamento das atividades</label>

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { demoActivities, demoClients } from '../../mocks/demoData'
 import { entryDateAvailabilityService } from '../../services/entryDateAvailabilityService'
-import { timeEntryService } from '../../services/timeEntryService'
+import { isRemoteTimeEntryStorageActive, timeEntryService } from '../../services/timeEntryService'
+import { backendApi } from '../../services/api'
+import { buildApiApontamentoPayload, offlineQueueService } from '../../services/offlineQueueService'
 import type { ParsedRDODay } from './rdoParser'
 import type { CreateTimeEntryData, TimeEntry, TimeEntryValidationErrors } from './types'
 import { expandTimeEntryDates, NORMAL_WORKDAY_MINUTES, requiresWorkSiteNumber } from './domain'
-import { getCorporateToday, isIsoDate, isWeekend } from '../../shared/utils/date'
+import { formatDatePtBr, getCorporateToday, isIsoDate, isWeekend } from '../../shared/utils/date'
+import { validateManualRdoDays } from './rdoManualHours'
 import { useSession } from '../session/useSession'
 import { areValidDurationParts, hoursAndMinutesToMinutes, validateTimeEntry } from './domain'
 
@@ -35,6 +38,9 @@ export type TimeEntryFormValues = {
   partialDayOffMinutes: string
   details: string
   funcaoContrato: string
+  numeroContrato: string
+  /** Importação de RDO: o colaborador informa início e fim de cada dia. */
+  rdoHoraManual: boolean
   editReason: string
 }
 
@@ -64,6 +70,8 @@ const emptyValues = (entryDate: string): TimeEntryFormValues => ({
   partialDayOffMinutes: '',
   details: '',
   funcaoContrato: '',
+  numeroContrato: '',
+  rdoHoraManual: false,
   editReason: '',
 })
 
@@ -94,6 +102,8 @@ function valuesFromEntry(entry: TimeEntry): TimeEntryFormValues {
     partialDayOffMinutes: entry.partialDayOffMinutes > 0 ? String(entry.partialDayOffMinutes % 60) : '',
     details: entry.details,
     funcaoContrato: entry.funcaoContrato ?? '',
+    numeroContrato: entry.numeroContrato ?? '',
+    rdoHoraManual: false,
     editReason: '',
   }
 }
@@ -207,6 +217,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       partialDayOffMinutes: hasExtractedRdoDays ? 0 : classifiedHours.partialDayOffMinutes,
       details: hasExtractedRdoDays ? firstExtractedDay.detalhamento : values.details,
       funcaoContrato: values.funcaoContrato,
+      numeroContrato: values.numeroContrato.trim() || undefined,
     }
     let dateBlock = { blocked: false } as Awaited<ReturnType<typeof entryDateAvailabilityService.getBlock>>
     if (isIsoDate(data.entryDate)) {
@@ -229,6 +240,11 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
     }
     if (mode === 'CREATE') {
       if (hasExtractedRdoDays) {
+        const manualError = values.rdoHoraManual ? validateManualRdoDays(extractedRdoDays, formatDatePtBr) : null
+        if (manualError) {
+          setSubmitError(manualError)
+          return false
+        }
         const invalidExtractedDay = extractedRdoDays.find((day) => !isIsoDate(day.data) || !day.detalhamento.trim() || !areValidDurationParts(day.horas, day.minutos))
         if (invalidExtractedDay) {
           setSubmitError('O RDO possui um ou mais dias com data, duração ou detalhamento inválido.')
@@ -252,6 +268,33 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       return false
     }
 
+    const syncOrQueueApontamentos = async (entries: CreateTimeEntryData[]) => {
+      // Com login Microsoft o timeEntryService já gravou no banco: reenviar duplicaria o apontamento.
+      if (isRemoteTimeEntryStorageActive()) return
+      const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
+      for (const entry of entries) {
+        const payload = buildApiApontamentoPayload(profile.id, entry, {
+          startTime: entry.startTime ?? values.startTime,
+          endTime: entry.endTime ?? values.endTime,
+        })
+        if (!isOnline) {
+          offlineQueueService.enqueueApontamento(profile.id, entry, {
+            startTime: entry.startTime ?? values.startTime,
+            endTime: entry.endTime ?? values.endTime,
+          })
+          continue
+        }
+        try {
+          await backendApi.createApontamento(payload)
+        } catch {
+          offlineQueueService.enqueueApontamento(profile.id, entry, {
+            startTime: entry.startTime ?? values.startTime,
+            endTime: entry.endTime ?? values.endTime,
+          })
+        }
+      }
+    }
+
     setIsSubmitting(true)
     try {
       if (mode === 'EDIT' && source) {
@@ -261,6 +304,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
         setSuccessMessage('Apontamento atualizado com sucesso.')
       } else if (mode === 'DUPLICATE' && source) {
         await timeEntryService.duplicate(profile.id, source.id, source.version, data)
+        await syncOrQueueApontamentos([data])
         setSuccessMessage('Apontamento duplicado com sucesso.')
       } else {
         if (hasExtractedRdoDays) {
@@ -278,8 +322,10 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
             nightMinutes: 0,
             partialDayOffMinutes: 0,
             details: day.detalhamento,
+            ...(values.rdoHoraManual ? { startTime: day.horaInicio, endTime: day.horaFim } : {}),
           }))
           await persistEntries(profile.id, extractedEntries, (collaboratorId, entry) => timeEntryService.create(collaboratorId, entry))
+          await syncOrQueueApontamentos(extractedEntries)
           setSuccessMessage(`${extractedRdoDays.length} lançamentos do RDO salvos individualmente com sucesso.`)
         } else {
           const entriesToSync = periodDates.map((date) => ({
@@ -289,6 +335,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
             weekdaysOnly: false,
           }))
           await persistEntries(profile.id, entriesToSync, (collaboratorId, entry) => timeEntryService.create(collaboratorId, entry))
+          await syncOrQueueApontamentos(entriesToSync)
           setSuccessMessage(periodDates.length > 1
             ? `${periodDates.length} lançamentos salvos com sucesso para o período selecionado.`
             : 'Apontamento salvo com sucesso.')
@@ -302,7 +349,7 @@ export function useTimeEntryForm({ initialDate, entryId, duplicateId }: { initia
       }
       return true
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar o apontamento no servidor.')
+      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar o apontamento.')
       return false
     } finally {
       setIsSubmitting(false)

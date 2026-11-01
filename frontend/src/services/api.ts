@@ -31,6 +31,7 @@ export type ApiApontamento = {
   dataCriacao: string
   emObra?: boolean
   numeroObra?: string
+  numeroContrato?: string
   clientId?: string
   disciplineCode?: string
   funcaoContrato?: string
@@ -49,6 +50,7 @@ export type CreateApiApontamentoInput = {
   justificativa?: string
   emObra?: boolean
   numeroObra?: string
+  numeroContrato?: string
   clientId?: string
   disciplineCode?: string
   funcaoContrato?: string

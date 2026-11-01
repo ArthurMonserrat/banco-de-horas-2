@@ -3,6 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { useSession } from '../features/session/useSession'
+import { SwitchSystemButton } from '../components/SwitchSystemButton'
+import { useCorporateIdentity } from '../features/profile/useCorporateIdentity'
 import { organogramaDEP, type DEPColaborador, type DEPGerencia } from '../data/mockDEP'
 import { exportGeneralHoursReport, exportSquadHoursReport } from '../services/excelExportService'
 import { directorNavigation } from '../mocks/navigation'
@@ -52,6 +54,7 @@ function createOrganogramaFromApiUsers(users: ApiUser[]): DEPGerencia[] {
 }
 
 function DiretoriaSidebar({ onSignOut }: { onSignOut: () => void }) {
+  const corporateIdentity = useCorporateIdentity()
   const linkClass = ({ isActive }: { isActive: boolean }) => `flex w-full items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left text-sm font-semibold transition ${
     isActive
       ? 'border-[var(--color-primary)] bg-[var(--color-navigation-active)] text-[var(--color-navigation-active-text)]'
@@ -62,10 +65,10 @@ function DiretoriaSidebar({ onSignOut }: { onSignOut: () => void }) {
     <aside className="hidden h-[calc(100vh-5rem)] w-64 flex-col bg-[var(--color-sidebar)] text-[var(--color-sidebar-text)] lg:sticky lg:top-20 lg:flex lg:self-start">
       <section className="border-b border-[var(--color-sidebar-border)] p-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-sm font-extrabold">DI</span>
+          <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-sm font-extrabold">{corporateIdentity?.initials ?? 'DI'}</span>
           <div>
-            <p className="text-sm font-extrabold leading-tight">Diretoria SM&A</p>
-            <p className="mt-0.5 text-xs leading-tight text-[var(--color-sidebar-text-muted)]">Visão macro</p>
+            <p className="text-sm font-extrabold leading-tight">{corporateIdentity?.fullName ?? 'Diretoria SM&A'}</p>
+            <p className="mt-0.5 text-xs leading-tight text-[var(--color-sidebar-text-muted)]">{corporateIdentity ? 'Diretoria' : 'Visão macro'}</p>
           </div>
         </div>
       </section>
@@ -82,6 +85,7 @@ function DiretoriaSidebar({ onSignOut }: { onSignOut: () => void }) {
         ))}
       </nav>
       <div className="border-t border-[var(--color-sidebar-border)] p-4">
+        <SwitchSystemButton />
         <button type="button" onClick={onSignOut} className="w-full rounded-xl border border-[var(--color-sidebar-border)] px-4 py-3 text-left text-sm font-bold text-[var(--color-sidebar-text)] hover:bg-[var(--color-navigation-hover)]">
           Sair do sistema
         </button>
